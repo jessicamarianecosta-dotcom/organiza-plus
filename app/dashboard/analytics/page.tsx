@@ -76,7 +76,7 @@ export default function Analytics() {
 
   return (
     <div className="min-h-screen bg-offwhite">
-      <div className="max-w-5xl mx-auto px-6 py-10">
+      <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 md:py-10">
         <div className="flex items-center gap-4 mb-8">
           <Link href="/dashboard" className="flex items-center gap-2 text-sm text-brand-muted hover:text-brand-dark transition-colors">
             <ArrowLeft size={16}/> Dashboard
@@ -85,7 +85,7 @@ export default function Analytics() {
         </div>
 
         {/* CARDS */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 gap-4 mb-8">
           {[
             { icon:<Calendar size={18}/>, label:'Total agendamentos', val: stats.total, color:'text-sage' },
             { icon:<Users size={18}/>, label:'Clientes únicos', val: stats.clients, color:'text-sage' },
@@ -101,7 +101,7 @@ export default function Analytics() {
         </div>
 
         {/* STATUS */}
-        <div className="grid md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-3 gap-2 md:gap-4 mb-6 md:mb-8">
           {[
             { label:'Este mês', val: stats.month, bg:'bg-sage-glow', color:'text-sage' },
             { label:'Pendentes', val: stats.pending, bg:'bg-amber-50', color:'text-amber-600' },
@@ -109,7 +109,7 @@ export default function Analytics() {
           ].map(c => (
             <div key={c.label} className={`${c.bg} rounded-2xl p-5 border border-nude/20`}>
               <p className="text-sm font-semibold text-brand-muted mb-1">{c.label}</p>
-              <p className={`text-4xl font-bold ${c.color}`}>{c.val}</p>
+              <p className={`text-2xl md:text-4xl font-bold ${c.color}`}>{c.val}</p>
             </div>
           ))}
         </div>

@@ -66,8 +66,8 @@ function DashboardInner() {
         </div>
       )}
 
-      {/* SIDEBAR */}
-      <aside className="w-60 bg-brand-dark flex flex-col py-6 fixed h-full z-10">
+      {/* SIDEBAR — desktop only */}
+      <aside className="hidden md:flex w-60 bg-brand-dark flex-col py-6 fixed h-full z-10">
         <div className="font-display text-xl text-cream px-6 pb-5 border-b border-white/10 mb-3">
           Organiza<span className="text-sage-light">+</span>
         </div>
@@ -101,8 +101,40 @@ function DashboardInner() {
         </div>
       </aside>
 
+      {/* BOTTOM NAV — mobile only */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-brand-dark border-t border-white/10 flex items-center justify-around px-2 py-2 safe-bottom">
+        {([
+          ['dashboard','Início',<LayoutDashboard size={20}/>],
+          ['agenda','Agenda',<Calendar size={20}/>],
+          ['clientes','Clientes',<Users size={20}/>],
+          ['horarios','Horários',<Clock size={20}/>],
+          ['perfil','Perfil',<Settings size={20}/>],
+        ] as const).map(([id,lb,ic])=>(
+          <button key={id} onClick={()=>setTab(id)}
+            className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all ${tab===id ? 'text-sage-light' : 'text-white/30'}`}>
+            {ic}
+            <span className="text-[10px] font-semibold">{lb}</span>
+          </button>
+        ))}
+      </nav>
+
+      {/* MOBILE HEADER */}
+      <header className="md:hidden fixed top-0 left-0 right-0 z-40 bg-brand-dark px-4 py-3 flex items-center justify-between border-b border-white/10">
+        <div className="font-display text-lg text-cream">Organiza<span className="text-sage-light">+</span></div>
+        <div className="flex items-center gap-2">
+          <span className="bg-sage/20 text-sage-light text-xs font-bold px-3 py-1 rounded-full capitalize">
+            {profile?.plan === 'premium' ? '💎' : '🌿'} {profile?.plan}
+          </span>
+          {profile && (
+            <Link href={`/p/${profile.slug}`} target="_blank" className="text-white/40 hover:text-sage-light p-1.5 rounded-lg hover:bg-white/5 transition-all">
+              <Globe size={16}/>
+            </Link>
+          )}
+        </div>
+      </header>
+
       {/* MAIN */}
-      <main className="flex-1 ml-60 p-8">
+      <main className="flex-1 md:ml-60 p-4 md:p-8 pt-16 md:pt-8 pb-24 md:pb-8">
         {tab==='dashboard' && (
           <div>
             <div className="flex justify-between items-start mb-8">
@@ -120,7 +152,7 @@ function DashboardInner() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 gap-3 mb-4">
               {[
                 ['📅','Hoje',String(todayAppts.length),'agendamentos'],
                 ['👥','Clientes',String(totalClients),'no total'],
@@ -137,7 +169,7 @@ function DashboardInner() {
             </div>
 
             {pending.length > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-5">
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4">
                 <div className="flex items-center gap-2 mb-3">
                   <Bell size={16} className="text-amber-500"/>
                   <span className="font-bold text-amber-700 text-sm">{pending.length} aguardando confirmação</span>
@@ -167,7 +199,7 @@ function DashboardInner() {
               {todayAppts.length === 0 ? (
                 <div className="py-12 text-center text-brand-muted text-sm">Nenhum agendamento para hoje.</div>
               ) : todayAppts.map(a=>(
-                <div key={a.id} className="flex items-center gap-4 px-6 py-4 border-b border-nude/30 last:border-0">
+                <div key={a.id} className="flex items-center gap-2 md:gap-4 px-3 md:px-6 py-3 md:py-4 border-b border-nude/30 last:border-0">
                   <div className="bg-sage-glow text-sage text-xs font-bold px-3 py-2 rounded-xl min-w-[52px] text-center">{a.appt_time.slice(0,5)}</div>
                   <div className="flex-1">
                     <p className="font-semibold text-sm text-brand-dark">{a.client_name}</p>
@@ -215,7 +247,7 @@ function AgendaTab({ appointments, onStatus, profile }: { appointments: Appointm
             {profile && <Link href={`/p/${profile.slug}`} target="_blank" className="text-sage text-sm font-semibold hover:underline">Ver minha página →</Link>}
           </div>
         ) : appointments.map(a=>(
-          <div key={a.id} className="flex items-center gap-4 px-6 py-4 border-b border-nude/30 last:border-0">
+          <div key={a.id} className="flex items-center gap-2 md:gap-4 px-3 md:px-6 py-3 md:py-4 border-b border-nude/30 last:border-0">
             <div className="text-center min-w-[56px]">
               <p className="text-xs text-brand-muted">{DAYS[new Date(a.appt_date+'T12:00').getDay()]}</p>
               <p className="font-bold text-brand-dark text-lg">{a.appt_date.split('-')[2]}</p>
@@ -254,7 +286,7 @@ function ClientesTab({ appointments }: { appointments: Appointment[] }) {
       <div className="bg-white rounded-2xl border border-nude/40 shadow-soft overflow-hidden">
         {clients.length === 0 ? <div className="py-16 text-center text-brand-muted text-sm">Nenhum cliente ainda.</div>
         : clients.map(([phone, appts]) => (
-          <div key={phone} className="flex items-center gap-4 px-6 py-4 border-b border-nude/30 last:border-0">
+          <div key={phone} className="flex items-center gap-2 md:gap-4 px-3 md:px-6 py-3 md:py-4 border-b border-nude/30 last:border-0">
             <div className="w-10 h-10 rounded-full bg-sage-glow flex items-center justify-center font-bold text-sage text-sm">{appts[0].client_name.charAt(0)}</div>
             <div className="flex-1">
               <p className="font-semibold text-brand-dark">{appts[0].client_name}</p>
