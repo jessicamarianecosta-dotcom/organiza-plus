@@ -1,189 +1,246 @@
 'use client'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { supabase, Profile, Appointment } from '@/lib/supabase'
-import { Calendar, Users, Clock, Bell, LogOut, Settings, Globe, LayoutDashboard, CheckCircle, XCircle, ExternalLink, TrendingUp, CreditCard, Upload, X } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { Suspense } from 'react'
+import { supabase, Profile, Appointment } from '@/lib/supabase'
+import { T, GlobalStyles, Btn, Badge, Input, Alert, ProgressBar } from '@/lib/ds'
+import { LayoutDashboard, Calendar, Users, Clock, Settings, Globe, LogOut, TrendingUp, CreditCard, ExternalLink, CheckCircle, XCircle, X, Menu, ChevronRight, Bell, Upload } from 'lucide-react'
 
-const STATUS_STYLE: Record<string,string> = {
-  pending:   'bg-amber-50 text-amber-600 border-amber-200',
-  confirmed: 'bg-sage-glow text-sage border-sage-pale',
-  cancelled: 'bg-red-50 text-red-500 border-red-200',
-  completed: 'bg-blue-50 text-blue-500 border-blue-200',
+const DAYS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
+
+type Tab = 'dashboard'|'agenda'|'clientes'|'horarios'|'perfil'
+
+const NAV_ITEMS: [Tab, string, any][] = [
+  ['dashboard', 'Dashboard', LayoutDashboard],
+  ['agenda',    'Agenda',    Calendar],
+  ['clientes',  'Clientes',  Users],
+  ['horarios',  'Horários',  Clock],
+  ['perfil',    'Meu perfil',Settings],
+]
+
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, { bg:string, color:string, label:string }> = {
+    pending:   { bg:'rgba(217,119,6,0.1)',  color:T.amber, label:'Pendente' },
+    confirmed: { bg:T.sageG,                color:T.sage,  label:'Confirmado' },
+    cancelled: { bg:T.redL,                 color:T.red,   label:'Cancelado' },
+    completed: { bg:T.blueL,                color:T.blue,  label:'Concluído' },
+  }
+  const s = map[status] || map.pending
+  return (
+    <span style={{ fontSize:10, fontWeight:700, padding:'3px 9px', borderRadius:T.r100, background:s.bg, color:s.color, whiteSpace:'nowrap' }}>
+      {s.label}
+    </span>
+  )
 }
-const STATUS_LABEL: Record<string,string> = { pending:'Pendente', confirmed:'Confirmado', cancelled:'Cancelado', completed:'Concluído' }
 
-function DashboardInner() {
-  const router   = useRouter()
-  const params   = useSearchParams()
-  const [profile, setProfile]           = useState<Profile|null>(null)
+function DashboardContent() {
+  const router = useRouter()
+  const params = useSearchParams()
+  const [profile, setProfile] = useState<Profile|null>(null)
   const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [loading, setLoading]           = useState(true)
-  const [tab, setTab]                   = useState<'dashboard'|'agenda'|'clientes'|'horarios'|'perfil'>('dashboard')
-  const [toast, setToast]               = useState('')
+  const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState<Tab>('dashboard')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [toast, setToast] = useState('')
 
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
     const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-    if (!p) { router.push('/onboarding'); return }  // Profile created by trigger, go to onboarding
+    if (!p) { router.push('/onboarding'); return }
     if (!(p as any).onboarding_done) { router.push('/onboarding'); return }
     setProfile(p)
     const { data: a } = await supabase.from('appointments').select('*').eq('professional_id', user.id).order('appt_date',{ascending:true}).order('appt_time',{ascending:true}).limit(100)
     setAppointments(a || [])
     setLoading(false)
-  }, [router])
+    if (params.get('payment') === 'success') setToast('🎉 Pagamento confirmado! Plano ativado.')
+  }, [router, params])
 
-  useEffect(() => {
-    load()
-    if (params.get('payment') === 'success') setToast('🎉 Pagamento confirmado! Seu plano foi ativado.')
-  }, [load, params])
+  useEffect(() => { load() }, [load])
 
   async function updateStatus(id: string, status: string) {
     await supabase.from('appointments').update({status}).eq('id',id)
-    setAppointments(prev => prev.map(a => a.id===id ? {...a, status: status as Appointment['status']} : a))
+    setAppointments(prev => prev.map(a => a.id===id ? {...a, status: status as any} : a))
   }
 
-  async function handleLogout() { await supabase.auth.signOut(); router.push('/') }
+  async function logout() { await supabase.auth.signOut(); router.push('/') }
 
-  if (loading) return <div className="min-h-screen bg-offwhite flex items-center justify-center"><div className="font-display text-2xl text-sage animate-pulse">Organiza+</div></div>
+  if (loading) return (
+    <div style={{ minHeight:'100vh', background:T.off, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:T.fontSans }}>
+      <GlobalStyles/>
+      <div style={{ textAlign:'center' }}>
+        <div style={{ fontFamily:T.fontSerif, fontSize:28, color:T.dark, marginBottom:12 }}>Organiza<span style={{ color:T.sage }}>+</span></div>
+        <div style={{ width:32, height:32, border:`3px solid ${T.sageP}`, borderTopColor:T.sage, borderRadius:'50%', animation:'spin 0.8s linear infinite', margin:'0 auto' }}/>
+      </div>
+    </div>
+  )
 
-  const today      = new Date().toISOString().split('T')[0]
+  const today = new Date().toISOString().split('T')[0]
   const todayAppts = appointments.filter(a => a.appt_date === today)
-  const pending    = appointments.filter(a => a.status === 'pending')
+  const pending = appointments.filter(a => a.status === 'pending')
   const totalClients = new Set(appointments.map(a => a.client_phone)).size
 
+  const sidebarW = 224
+
   return (
-    <div className="min-h-screen bg-offwhite flex">
-      {/* TOAST */}
+    <div style={{ minHeight:'100vh', background:T.off, fontFamily:T.fontSans, color:T.dark }}>
+      <GlobalStyles/>
+
+      {/* Toast */}
       {toast && (
-        <div className="fixed top-4 right-4 z-50 bg-sage text-cream px-5 py-3 rounded-2xl shadow-lg flex items-center gap-3 animate-bounce">
-          <span className="text-sm font-semibold">{toast}</span>
-          <button onClick={()=>setToast('')}><X size={14}/></button>
+        <div style={{ position:'fixed', top:20, right:20, zIndex:200, background:T.sage, color:T.cream, padding:'12px 18px', borderRadius:T.r14, boxShadow:T.shadowLg, display:'flex', alignItems:'center', gap:10, fontSize:13, fontWeight:600 }}>
+          {toast}
+          <button onClick={()=>setToast('')} style={{ background:'none', border:'none', color:'inherit', cursor:'pointer', padding:2 }}><X size={14}/></button>
         </div>
       )}
 
-      {/* SIDEBAR — desktop only */}
-      <aside className="hidden md:flex w-60 bg-brand-dark flex-col py-6 fixed h-full z-10">
-        <div className="font-display text-xl text-cream px-6 pb-5 border-b border-white/10 mb-3">
-          Organiza<span className="text-sage-light">+</span>
+      {/* Mobile overlay */}
+      {sidebarOpen && <div onClick={()=>setSidebarOpen(false)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:40, backdropFilter:'blur(2px)' }}/>}
+
+      {/* ── SIDEBAR ── */}
+      <aside style={{
+        position:'fixed', top:0, left:0, height:'100vh', width:sidebarW,
+        background:T.dark, display:'flex', flexDirection:'column', zIndex:50,
+        transition:'transform 0.3s ease',
+        transform: typeof window !== 'undefined' && window.innerWidth < 768 && !sidebarOpen ? `translateX(-${sidebarW}px)` : 'none',
+      }} className="sidebar">
+        <style>{`.sidebar { @media(max-width:767px){ transform: ${sidebarOpen?'translateX(0)':'translateX(-224px)'}; } }`}</style>
+        {/* Logo */}
+        <div style={{ padding:'22px 20px 18px', borderBottom:'1px solid rgba(255,255,255,0.08)', marginBottom:8 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <div style={{ width:8, height:8, borderRadius:'50%', background:T.sage }}/>
+            <span style={{ fontFamily:T.fontSerif, fontSize:18, color:T.cream }}>
+              Organiza<span style={{ color:T.sageL }}>+</span>
+            </span>
+          </div>
         </div>
-        {([
-          ['dashboard','Dashboard',<LayoutDashboard size={16}/>],
-          ['agenda','Agenda',<Calendar size={16}/>],
-          ['clientes','Clientes',<Users size={16}/>],
-          ['horarios','Horários',<Clock size={16}/>],
-          ['perfil','Meu perfil',<Settings size={16}/>],
-        ] as const).map(([id,lb,ic])=>(
-          <button key={id} onClick={()=>setTab(id)}
-            className={`flex items-center gap-3 mx-3 px-3 py-2.5 rounded-xl text-sm font-medium text-left transition-all ${tab===id ? 'bg-sage/20 text-sage-light' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
-            {ic}{lb}
-          </button>
-        ))}
-        <div className="mt-auto px-3 space-y-1">
-          <Link href="/dashboard/analytics" className="flex items-center gap-2 px-3 py-2.5 text-white/30 hover:text-sage-light text-sm rounded-xl hover:bg-white/5 transition-all">
-            <TrendingUp size={15}/> Analytics
+
+        {/* Nav items */}
+        <div style={{ flex:1, padding:'4px 10px', display:'flex', flexDirection:'column', gap:2 }}>
+          {NAV_ITEMS.map(([id, label, Icon]) => (
+            <button key={id} onClick={()=>{setTab(id);setSidebarOpen(false)}}
+              style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:T.r12, fontSize:13, fontWeight:500, border:'none', cursor:'pointer', textAlign:'left', transition:'all 0.15s', background:tab===id?'rgba(122,158,135,0.2)':'transparent', color:tab===id?T.sageL:'rgba(255,255,255,0.38)' }}
+              onMouseEnter={e=>{ if(tab!==id) e.currentTarget.style.background='rgba(255,255,255,0.06)'; if(tab!==id) e.currentTarget.style.color='rgba(255,255,255,0.7)' }}
+              onMouseLeave={e=>{ if(tab!==id) e.currentTarget.style.background='transparent'; if(tab!==id) e.currentTarget.style.color='rgba(255,255,255,0.38)' }}>
+              <Icon size={16}/> {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding:'10px 10px 20px', borderTop:'1px solid rgba(255,255,255,0.06)', display:'flex', flexDirection:'column', gap:1 }}>
+          <Link href="/dashboard/analytics" style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderRadius:T.r12, fontSize:12, fontWeight:500, color:'rgba(255,255,255,0.32)', textDecoration:'none', transition:'all 0.15s' }}
+            onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.05)';e.currentTarget.style.color=T.sageL}}
+            onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='rgba(255,255,255,0.32)'}}>
+            <TrendingUp size={14}/> Analytics
           </Link>
-          <Link href="/planos" className="flex items-center gap-2 px-3 py-2.5 text-white/30 hover:text-sage-light text-sm rounded-xl hover:bg-white/5 transition-all">
-            <CreditCard size={15}/> Planos
+          <Link href="/planos" style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderRadius:T.r12, fontSize:12, fontWeight:500, color:'rgba(255,255,255,0.32)', textDecoration:'none', transition:'all 0.15s' }}
+            onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.05)';e.currentTarget.style.color=T.sageL}}
+            onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='rgba(255,255,255,0.32)'}}>
+            <CreditCard size={14}/> Planos
           </Link>
           {profile && (
-            <Link href={`/p/${profile.slug}`} target="_blank" className="flex items-center gap-2 px-3 py-2.5 text-white/30 hover:text-sage-light text-sm rounded-xl hover:bg-white/5 transition-all">
-              <Globe size={15}/> Minha página <ExternalLink size={12}/>
+            <Link href={`/p/${profile.slug}`} target="_blank" style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderRadius:T.r12, fontSize:12, fontWeight:500, color:'rgba(255,255,255,0.32)', textDecoration:'none', transition:'all 0.15s' }}
+              onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.05)';e.currentTarget.style.color=T.sageL}}
+              onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='rgba(255,255,255,0.32)'}}>
+              <Globe size={14}/> Minha página <ExternalLink size={11}/>
             </Link>
           )}
-          <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2.5 text-white/30 hover:text-red-400 text-sm rounded-xl hover:bg-white/5 w-full transition-all">
-            <LogOut size={15}/> Sair
+          <button onClick={logout} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderRadius:T.r12, fontSize:12, fontWeight:500, color:'rgba(255,255,255,0.32)', background:'none', border:'none', cursor:'pointer', textAlign:'left', width:'100%', transition:'all 0.15s' }}
+            onMouseEnter={e=>{e.currentTarget.style.background='rgba(239,68,68,0.12)';e.currentTarget.style.color='#f87171'}}
+            onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='rgba(255,255,255,0.32)'}}>
+            <LogOut size={14}/> Sair
           </button>
         </div>
       </aside>
 
-      {/* BOTTOM NAV — mobile only */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-brand-dark border-t border-white/10 flex items-center justify-around px-2 py-2 safe-bottom">
-        {([
-          ['dashboard','Início',<LayoutDashboard size={20}/>],
-          ['agenda','Agenda',<Calendar size={20}/>],
-          ['clientes','Clientes',<Users size={20}/>],
-          ['horarios','Horários',<Clock size={20}/>],
-          ['perfil','Perfil',<Settings size={20}/>],
-        ] as const).map(([id,lb,ic])=>(
+      {/* ── MOBILE HEADER ── */}
+      <header style={{ position:'fixed', top:0, left:0, right:0, height:56, background:T.dark, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 16px', zIndex:30, borderBottom:'1px solid rgba(255,255,255,0.06)' }} className="md-hide">
+        <style>{`@media(min-width:768px){ .md-hide{ display:none!important; } .main-content{ margin-left:${sidebarW}px!important; } } @media(max-width:767px){ .main-content{ margin-left:0!important; padding-top:72px!important; padding-bottom:80px!important; } }`}</style>
+        <button onClick={()=>setSidebarOpen(!sidebarOpen)} style={{ background:'none', border:'none', color:T.cream, cursor:'pointer', padding:4 }}>
+          <Menu size={22}/>
+        </button>
+        <span style={{ fontFamily:T.fontSerif, fontSize:18, color:T.cream }}>Organiza<span style={{ color:T.sageL }}>+</span></span>
+        {profile && <Link href={`/p/${profile.slug}`} target="_blank" style={{ color:'rgba(255,255,255,0.4)', display:'flex' }}><Globe size={18}/></Link>}
+      </header>
+
+      {/* ── BOTTOM NAV (mobile) ── */}
+      <nav style={{ position:'fixed', bottom:0, left:0, right:0, background:T.dark, borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-around', padding:'6px 0 8px', zIndex:30 }} className="md-hide">
+        {NAV_ITEMS.map(([id, label, Icon]) => (
           <button key={id} onClick={()=>setTab(id)}
-            className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all ${tab===id ? 'text-sage-light' : 'text-white/30'}`}>
-            {ic}
-            <span className="text-[10px] font-semibold">{lb}</span>
+            style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:2, padding:'6px 12px', background:'none', border:'none', cursor:'pointer', color:tab===id?T.sageL:'rgba(255,255,255,0.3)', transition:'color 0.15s' }}>
+            <Icon size={20}/>
+            <span style={{ fontSize:9, fontWeight:600 }}>{label}</span>
           </button>
         ))}
       </nav>
 
-      {/* MOBILE HEADER */}
-      <header className="md:hidden fixed top-0 left-0 right-0 z-40 bg-brand-dark px-4 py-3 flex items-center justify-between border-b border-white/10">
-        <div className="font-display text-lg text-cream">Organiza<span className="text-sage-light">+</span></div>
-        <div className="flex items-center gap-2">
-          <span className="bg-sage/20 text-sage-light text-xs font-bold px-3 py-1 rounded-full capitalize">
-            {profile?.plan === 'premium' ? '💎' : '🌿'} {profile?.plan}
-          </span>
-          {profile && (
-            <Link href={`/p/${profile.slug}`} target="_blank" className="text-white/40 hover:text-sage-light p-1.5 rounded-lg hover:bg-white/5 transition-all">
-              <Globe size={16}/>
-            </Link>
-          )}
-        </div>
-      </header>
+      {/* ── MAIN CONTENT ── */}
+      <main style={{ marginLeft:sidebarW, padding:'32px', minHeight:'100vh' }} className="main-content">
 
-      {/* MAIN */}
-      <main className="flex-1 md:ml-60 p-4 md:p-8 pt-16 md:pt-8 pb-24 md:pb-8">
+        {/* ── TAB: DASHBOARD ── */}
         {tab==='dashboard' && (
-          <div>
-            <div className="flex justify-between items-start mb-8">
+          <div className="anim-fade">
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:28, flexWrap:'wrap', gap:12 }}>
               <div>
-                <h1 className="text-2xl font-bold text-brand-dark">Olá, {profile?.name?.split(' ')[0]} 👋</h1>
-                <p className="text-sm text-brand-muted mt-1">{format(new Date(),'EEEE, dd \'de\' MMMM \'de\' yyyy',{locale:ptBR})}</p>
+                <h1 style={{ fontFamily:T.fontSerif, fontSize:28, color:T.dark, margin:'0 0 4px' }}>
+                  Olá, {profile?.name?.split(' ')[0]} 👋
+                </h1>
+                <p style={{ fontSize:14, color:T.muted }}>
+                  {format(new Date(), "EEEE, dd 'de' MMMM 'de' yyyy", {locale:ptBR})}
+                </p>
               </div>
-              <div className="flex items-center gap-3">
-                <Link href="/dashboard/analytics" className="flex items-center gap-2 bg-sage-glow text-sage text-xs font-bold px-4 py-2 rounded-full border border-sage-pale hover:bg-sage hover:text-cream transition-all">
-                  <TrendingUp size={13}/> Analytics
-                </Link>
-                <span className="bg-sage-glow text-sage text-xs font-bold px-4 py-1.5 rounded-full border border-sage-pale capitalize">
-                  {profile?.plan === 'premium' ? '💎 Premium' : '🌿 Basic'}
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                {pending.length > 0 && (
+                  <span style={{ background:T.amberL, color:T.amber, border:`1px solid ${T.amberB}`, fontSize:11, fontWeight:700, padding:'5px 12px', borderRadius:T.r100 }}>
+                    <Bell size={11} style={{ display:'inline', marginRight:5 }}/>{pending.length} pendente{pending.length>1?'s':''}
+                  </span>
+                )}
+                <span style={{ background:T.sageG, color:T.sage, border:`1px solid ${T.sageP}`, fontSize:11, fontWeight:700, padding:'5px 12px', borderRadius:T.r100 }}>
+                  {profile?.plan==='premium'?'💎 Premium':'🌿 Basic'}
                 </span>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 mb-4">
+            {/* Stat cards */}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:16, marginBottom:24 }}>
               {[
-                ['📅','Hoje',String(todayAppts.length),'agendamentos'],
-                ['👥','Clientes',String(totalClients),'no total'],
-                ['⏳','Pendentes',String(pending.length),'aguardando'],
-                ['✅','Concluídos',String(appointments.filter(a=>a.status==='completed').length),'no total'],
-              ].map(([ic,lb,v,sub])=>(
-                <div key={lb} className="bg-white rounded-2xl p-5 border border-nude/40 shadow-soft">
-                  <div className="text-xl mb-2">{ic}</div>
-                  <p className="text-xs text-brand-muted font-semibold uppercase tracking-wider">{lb}</p>
-                  <p className="text-3xl font-bold text-brand-dark mt-1">{v}</p>
-                  <p className="text-xs text-sage mt-0.5">{sub}</p>
+                { icon:'📅', label:'Hoje',       value:String(todayAppts.length), sub:'agendamentos', color:T.sage },
+                { icon:'👥', label:'Clientes',    value:String(totalClients),       sub:'no total',     color:T.blue },
+                { icon:'⏳', label:'Pendentes',   value:String(pending.length),     sub:'aguardando',   color:T.amber },
+                { icon:'✅', label:'Concluídos',  value:String(appointments.filter(a=>a.status==='completed').length), sub:'no total', color:T.green },
+              ].map(c=>(
+                <div key={c.label} style={{ background:T.white, borderRadius:T.r20, padding:'20px', boxShadow:T.shadowCard }}>
+                  <div style={{ fontSize:22, marginBottom:10 }}>{c.icon}</div>
+                  <p style={{ fontSize:10, fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.08em', margin:0 }}>{c.label}</p>
+                  <p style={{ fontSize:30, fontWeight:800, color:T.dark, margin:'5px 0 2px', lineHeight:1 }}>{c.value}</p>
+                  <p style={{ fontSize:11, color:c.color, fontWeight:500, margin:0 }}>{c.sub}</p>
                 </div>
               ))}
             </div>
 
+            {/* Pending alert */}
             {pending.length > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Bell size={16} className="text-amber-500"/>
-                  <span className="font-bold text-amber-700 text-sm">{pending.length} aguardando confirmação</span>
-                </div>
-                <div className="space-y-2">
+              <div style={{ background:T.amberL, border:`1px solid ${T.amberB}`, borderRadius:T.r20, padding:'18px 20px', marginBottom:20 }}>
+                <p style={{ fontSize:13, fontWeight:700, color:T.amber, margin:'0 0 12px', display:'flex', alignItems:'center', gap:8 }}>
+                  <Bell size={15}/> {pending.length} agendamento{pending.length>1?'s':''} aguardando confirmação
+                </p>
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                   {pending.slice(0,3).map(a=>(
-                    <div key={a.id} className="flex items-center justify-between bg-white rounded-xl px-4 py-3 border border-amber-100">
-                      <div>
-                        <p className="font-semibold text-sm text-brand-dark">{a.client_name}</p>
-                        <p className="text-xs text-brand-muted">{a.appt_date} às {a.appt_time.slice(0,5)}</p>
+                    <div key={a.id} style={{ background:T.white, borderRadius:T.r12, padding:'12px 14px', display:'flex', alignItems:'center', gap:12, boxShadow:T.shadowSm }}>
+                      <div style={{ flex:1 }}>
+                        <p style={{ fontWeight:700, fontSize:14, color:T.dark, margin:0 }}>{a.client_name}</p>
+                        <p style={{ fontSize:12, color:T.muted, margin:0 }}>{a.appt_date} às {a.appt_time.slice(0,5)}</p>
                       </div>
-                      <div className="flex gap-2">
-                        <button onClick={()=>updateStatus(a.id,'confirmed')} className="flex items-center gap-1 bg-sage text-white text-xs font-semibold px-3 py-1.5 rounded-lg"><CheckCircle size={12}/> Confirmar</button>
-                        <button onClick={()=>updateStatus(a.id,'cancelled')} className="flex items-center gap-1 bg-red-100 text-red-500 text-xs font-semibold px-3 py-1.5 rounded-lg"><XCircle size={12}/> Cancelar</button>
+                      <div style={{ display:'flex', gap:8 }}>
+                        <button onClick={()=>updateStatus(a.id,'confirmed')} style={{ display:'flex', alignItems:'center', gap:5, background:T.sage, color:T.cream, border:'none', borderRadius:T.r10, padding:'7px 12px', fontSize:12, fontWeight:600, cursor:'pointer' }}>
+                          <CheckCircle size={13}/> Confirmar
+                        </button>
+                        <button onClick={()=>updateStatus(a.id,'cancelled')} style={{ display:'flex', alignItems:'center', gap:5, background:T.redL, color:T.red, border:'none', borderRadius:T.r10, padding:'7px 12px', fontSize:12, fontWeight:600, cursor:'pointer' }}>
+                          <XCircle size={13}/> Cancelar
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -191,25 +248,35 @@ function DashboardInner() {
               </div>
             )}
 
-            <div className="bg-white rounded-2xl border border-nude/40 shadow-soft overflow-hidden">
-              <div className="px-6 py-4 border-b border-nude flex justify-between items-center">
-                <h2 className="font-bold text-brand-dark">Agendamentos de hoje</h2>
-                <span className="bg-sage-glow text-sage text-xs font-bold px-3 py-1 rounded-full">{todayAppts.length}</span>
+            {/* Today's appointments */}
+            <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, overflow:'hidden' }}>
+              <div style={{ padding:'16px 20px', borderBottom:`1px solid ${T.nude}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <h2 style={{ fontFamily:T.fontSerif, fontSize:20, color:T.dark, margin:0 }}>Agendamentos de hoje</h2>
+                <span style={{ background:T.sageG, color:T.sage, fontSize:11, fontWeight:700, padding:'4px 11px', borderRadius:T.r100, border:`1px solid ${T.sageP}` }}>
+                  {todayAppts.length} hoje
+                </span>
               </div>
               {todayAppts.length === 0 ? (
-                <div className="py-12 text-center text-brand-muted text-sm">Nenhum agendamento para hoje.</div>
+                <div style={{ padding:'48px 24px', textAlign:'center', color:T.muted }}>
+                  <div style={{ fontSize:40, marginBottom:12 }}>📅</div>
+                  <p style={{ fontWeight:600, color:T.dark, marginBottom:4 }}>Nenhum agendamento hoje</p>
+                  <p style={{ fontSize:13 }}>Compartilhe sua página pública para receber mais clientes.</p>
+                  {profile && <Link href={`/p/${profile.slug}`} target="_blank" style={{ color:T.sage, fontSize:13, fontWeight:600, marginTop:8, display:'inline-block' }}>Ver minha página →</Link>}
+                </div>
               ) : todayAppts.map(a=>(
-                <div key={a.id} className="flex items-center gap-2 md:gap-4 px-3 md:px-6 py-3 md:py-4 border-b border-nude/30 last:border-0">
-                  <div className="bg-sage-glow text-sage text-xs font-bold px-3 py-2 rounded-xl min-w-[52px] text-center">{a.appt_time.slice(0,5)}</div>
-                  <div className="flex-1">
-                    <p className="font-semibold text-sm text-brand-dark">{a.client_name}</p>
-                    <p className="text-xs text-brand-muted">{a.client_phone}</p>
+                <div key={a.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 20px', borderBottom:`1px solid ${T.nude}` }}>
+                  <div style={{ background:T.sageG, color:T.sage, fontSize:12, fontWeight:700, padding:'6px 10px', borderRadius:T.r10, flexShrink:0, minWidth:52, textAlign:'center' }}>
+                    {a.appt_time.slice(0,5)}
                   </div>
-                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${STATUS_STYLE[a.status]}`}>{STATUS_LABEL[a.status]}</span>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <p style={{ fontWeight:600, fontSize:14, color:T.dark, margin:0 }}>{a.client_name}</p>
+                    <p style={{ fontSize:12, color:T.muted, margin:0 }}>{a.client_phone}</p>
+                  </div>
+                  <StatusBadge status={a.status}/>
                   {a.status==='pending' && (
-                    <div className="flex gap-1">
-                      <button onClick={()=>updateStatus(a.id,'confirmed')} className="bg-sage text-white text-xs px-2.5 py-1 rounded-lg"><CheckCircle size={12}/></button>
-                      <button onClick={()=>updateStatus(a.id,'cancelled')} className="bg-red-100 text-red-500 text-xs px-2.5 py-1 rounded-lg"><XCircle size={12}/></button>
+                    <div style={{ display:'flex', gap:6 }}>
+                      <button onClick={()=>updateStatus(a.id,'confirmed')} style={{ background:T.sage, color:T.cream, border:'none', borderRadius:T.r10, padding:'6px 10px', cursor:'pointer', fontSize:12 }}>✓</button>
+                      <button onClick={()=>updateStatus(a.id,'cancelled')} style={{ background:T.redL, color:T.red, border:'none', borderRadius:T.r10, padding:'6px 10px', cursor:'pointer', fontSize:12 }}>✗</button>
                     </div>
                   )}
                 </div>
@@ -218,254 +285,242 @@ function DashboardInner() {
           </div>
         )}
 
-        {tab==='agenda' && <AgendaTab appointments={appointments} onStatus={updateStatus} profile={profile}/>}
-        {tab==='clientes' && <ClientesTab appointments={appointments}/>}
+        {/* ── TAB: AGENDA ── */}
+        {tab==='agenda' && (
+          <div className="anim-fade">
+            <h1 style={{ fontFamily:T.fontSerif, fontSize:28, color:T.dark, marginBottom:20 }}>Agenda completa</h1>
+            <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, overflow:'hidden' }}>
+              {appointments.length === 0 ? (
+                <div style={{ padding:'64px 24px', textAlign:'center' }}>
+                  <p style={{ fontSize:40, marginBottom:12 }}>📅</p>
+                  <p style={{ fontWeight:600, color:T.dark }}>Nenhum agendamento ainda</p>
+                  {profile && <Link href={`/p/${profile.slug}`} target="_blank" style={{ color:T.sage, fontSize:13, fontWeight:600 }}>Ver minha página →</Link>}
+                </div>
+              ) : appointments.map(a=>(
+                <div key={a.id} style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 20px', borderBottom:`1px solid ${T.nude}` }}>
+                  <div style={{ textAlign:'center', minWidth:52 }}>
+                    <p style={{ fontSize:10, color:T.muted, margin:0, fontWeight:600 }}>{DAYS[new Date(a.appt_date+'T12:00').getDay()]}</p>
+                    <p style={{ fontWeight:800, fontSize:20, color:T.dark, margin:'2px 0' }}>{a.appt_date.split('-')[2]}</p>
+                    <p style={{ fontSize:11, color:T.sage, fontWeight:700, margin:0 }}>{a.appt_time.slice(0,5)}</p>
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <p style={{ fontWeight:600, fontSize:14, color:T.dark, margin:0 }}>{a.client_name}</p>
+                    <p style={{ fontSize:12, color:T.muted, margin:0 }}>{a.client_phone}{a.client_email?` · ${a.client_email}`:''}</p>
+                    {a.notes && <p style={{ fontSize:12, color:T.mid, fontStyle:'italic', margin:'2px 0 0' }}>"{a.notes}"</p>}
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <StatusBadge status={a.status}/>
+                    {a.status==='pending' && <>
+                      <button onClick={()=>updateStatus(a.id,'confirmed')} style={{ background:T.sage, color:T.cream, border:'none', borderRadius:T.r10, padding:'6px 11px', cursor:'pointer', fontSize:12, fontWeight:600 }}>✓</button>
+                      <button onClick={()=>updateStatus(a.id,'cancelled')} style={{ background:T.redL, color:T.red, border:'none', borderRadius:T.r10, padding:'6px 11px', cursor:'pointer', fontSize:12, fontWeight:600 }}>✗</button>
+                    </>}
+                    {a.status==='confirmed' && <button onClick={()=>updateStatus(a.id,'completed')} style={{ background:T.blueL, color:T.blue, border:'none', borderRadius:T.r10, padding:'6px 11px', cursor:'pointer', fontSize:12, fontWeight:600 }}>Concluir</button>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB: CLIENTES ── */}
+        {tab==='clientes' && (
+          <div className="anim-fade">
+            <h1 style={{ fontFamily:T.fontSerif, fontSize:28, color:T.dark, marginBottom:20 }}>
+              Clientes <span style={{ fontSize:18, color:T.muted, fontWeight:400 }}>({new Set(appointments.map(a=>a.client_phone)).size})</span>
+            </h1>
+            <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, overflow:'hidden' }}>
+              {(() => {
+                const map = new Map<string, Appointment[]>()
+                appointments.forEach(a => { if (!map.has(a.client_phone)) map.set(a.client_phone, []); map.get(a.client_phone)!.push(a) })
+                const clients = Array.from(map.entries())
+                if (!clients.length) return <div style={{ padding:'64px', textAlign:'center', color:T.muted }}>Nenhum cliente ainda.</div>
+                return clients.map(([phone, appts]) => (
+                  <div key={phone} style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 20px', borderBottom:`1px solid ${T.nude}` }}>
+                    <div style={{ width:42, height:42, borderRadius:'50%', background:T.sageG, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, color:T.sage, fontSize:16, flexShrink:0 }}>
+                      {appts[0].client_name.charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ flex:1 }}>
+                      <p style={{ fontWeight:600, fontSize:14, color:T.dark, margin:0 }}>{appts[0].client_name}</p>
+                      <p style={{ fontSize:12, color:T.muted, margin:0 }}>{phone}{appts[0].client_email?` · ${appts[0].client_email}`:''}</p>
+                    </div>
+                    <div style={{ textAlign:'right' }}>
+                      <p style={{ fontWeight:700, fontSize:18, color:T.dark, margin:0 }}>{appts.length}</p>
+                      <p style={{ fontSize:11, color:T.muted, margin:0 }}>consulta{appts.length!==1?'s':''}</p>
+                    </div>
+                  </div>
+                ))
+              })()}
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB: HORÁRIOS ── */}
         {tab==='horarios' && <AvailabilityTab profile={profile}/>}
+
+        {/* ── TAB: PERFIL ── */}
         {tab==='perfil' && <ProfileTab profile={profile} onSave={load}/>}
       </main>
     </div>
   )
 }
 
-function AgendaTab({ appointments, onStatus, profile }: { appointments: Appointment[], onStatus: (id:string,s:string)=>void, profile: Profile|null }) {
-  const STATUS_STYLE: Record<string,string> = {
-    pending:'bg-amber-50 text-amber-600 border-amber-200',
-    confirmed:'bg-sage-glow text-sage border-sage-pale',
-    cancelled:'bg-red-50 text-red-500 border-red-200',
-    completed:'bg-blue-50 text-blue-500 border-blue-200',
-  }
-  const STATUS_LABEL: Record<string,string> = { pending:'Pendente', confirmed:'Confirmado', cancelled:'Cancelado', completed:'Concluído' }
-  const DAYS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
-  return (
-    <div>
-      <h1 className="text-2xl font-bold text-brand-dark mb-6">Todos os agendamentos</h1>
-      <div className="bg-white rounded-2xl border border-nude/40 shadow-soft overflow-hidden">
-        {appointments.length === 0 ? (
-          <div className="py-16 text-center">
-            <p className="text-4xl mb-3">📅</p>
-            <p className="font-semibold text-brand-dark mb-1">Nenhum agendamento ainda</p>
-            {profile && <Link href={`/p/${profile.slug}`} target="_blank" className="text-sage text-sm font-semibold hover:underline">Ver minha página →</Link>}
-          </div>
-        ) : appointments.map(a=>(
-          <div key={a.id} className="flex items-center gap-2 md:gap-4 px-3 md:px-6 py-3 md:py-4 border-b border-nude/30 last:border-0">
-            <div className="text-center min-w-[56px]">
-              <p className="text-xs text-brand-muted">{DAYS[new Date(a.appt_date+'T12:00').getDay()]}</p>
-              <p className="font-bold text-brand-dark text-lg">{a.appt_date.split('-')[2]}</p>
-              <p className="text-xs text-sage font-semibold">{a.appt_time.slice(0,5)}</p>
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-brand-dark">{a.client_name}</p>
-              <p className="text-xs text-brand-muted">{a.client_phone}{a.client_email && ` · ${a.client_email}`}</p>
-              {a.notes && <p className="text-xs text-brand-mid mt-0.5 italic">"{a.notes}"</p>}
-            </div>
-            <div className="flex items-center gap-2">
-              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${STATUS_STYLE[a.status]}`}>{STATUS_LABEL[a.status]}</span>
-              {a.status==='pending' && <>
-                <button onClick={()=>onStatus(a.id,'confirmed')} className="bg-sage text-white text-xs px-2.5 py-1.5 rounded-lg font-semibold">✓</button>
-                <button onClick={()=>onStatus(a.id,'cancelled')} className="bg-red-100 text-red-500 text-xs px-2.5 py-1.5 rounded-lg font-semibold">✗</button>
-              </>}
-              {a.status==='confirmed' && <button onClick={()=>onStatus(a.id,'completed')} className="bg-blue-50 text-blue-500 text-xs px-2.5 py-1.5 rounded-lg font-semibold">Concluir</button>}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function ClientesTab({ appointments }: { appointments: Appointment[] }) {
-  const clientMap = new Map<string, Appointment[]>()
-  appointments.forEach(a => {
-    if (!clientMap.has(a.client_phone)) clientMap.set(a.client_phone, [])
-    clientMap.get(a.client_phone)!.push(a)
-  })
-  const clients = Array.from(clientMap.entries())
-  return (
-    <div>
-      <h1 className="text-2xl font-bold text-brand-dark mb-6">Clientes <span className="text-brand-muted text-lg font-normal">({clients.length})</span></h1>
-      <div className="bg-white rounded-2xl border border-nude/40 shadow-soft overflow-hidden">
-        {clients.length === 0 ? <div className="py-16 text-center text-brand-muted text-sm">Nenhum cliente ainda.</div>
-        : clients.map(([phone, appts]) => (
-          <div key={phone} className="flex items-center gap-2 md:gap-4 px-3 md:px-6 py-3 md:py-4 border-b border-nude/30 last:border-0">
-            <div className="w-10 h-10 rounded-full bg-sage-glow flex items-center justify-center font-bold text-sage text-sm">{appts[0].client_name.charAt(0)}</div>
-            <div className="flex-1">
-              <p className="font-semibold text-brand-dark">{appts[0].client_name}</p>
-              <p className="text-xs text-brand-muted">{phone}{appts[0].client_email && ` · ${appts[0].client_email}`}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-sm font-bold text-brand-dark">{appts.length}</p>
-              <p className="text-xs text-brand-muted">consulta{appts.length!==1?'s':''}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function CheckIcon({ size }: { size: number }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}><polyline points="20 6 9 17 4 12"/></svg>
-}
-
 function AvailabilityTab({ profile }: { profile: Profile|null }) {
+  const DAYS_FULL = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
   const [avail, setAvail] = useState<{day:number,start:string,end:string}[]>([])
   const [saving, setSaving] = useState(false)
-  const [saved, setSaved]   = useState(false)
-  const DAYS_FULL = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
+  const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     if (!profile) return
-    supabase.from('availability').select('*').eq('professional_id', profile.id).eq('active',true)
-      .then(({data}) => { if (data) setAvail(data.map(d=>({day:d.day_of_week,start:d.start_time,end:d.end_time}))) })
+    supabase.from('availability').select('*').eq('professional_id',profile.id).eq('active',true)
+      .then(({data}) => { if(data) setAvail(data.map(d=>({day:d.day_of_week,start:d.start_time,end:d.end_time}))) })
   }, [profile])
 
-  function toggleDay(d: number) { setAvail(prev => prev.some(a=>a.day===d) ? prev.filter(a=>a.day!==d) : [...prev, {day:d,start:'08:00',end:'18:00'}]) }
-  function update(d:number, k:string, v:string) { setAvail(prev => prev.map(a => a.day===d ? {...a,[k]:v} : a)) }
+  function toggle(d:number) { setAvail(p=>p.some(a=>a.day===d)?p.filter(a=>a.day!==d):[...p,{day:d,start:'08:00',end:'18:00'}].sort((a,b)=>a.day-b.day)) }
+  function upd(d:number,k:string,v:string) { setAvail(p=>p.map(a=>a.day===d?{...a,[k]:v}:a)) }
 
   async function save() {
     if (!profile) return; setSaving(true)
-    await supabase.from('availability').delete().eq('professional_id', profile.id)
-    if (avail.length > 0) await supabase.from('availability').insert(avail.map(a=>({professional_id:profile.id,day_of_week:a.day,start_time:a.start,end_time:a.end,slot_minutes:60})))
+    await supabase.from('availability').delete().eq('professional_id',profile.id)
+    if (avail.length) await supabase.from('availability').insert(avail.map(a=>({professional_id:profile.id,day_of_week:a.day,start_time:a.start,end_time:a.end,slot_minutes:60})))
     setSaving(false); setSaved(true); setTimeout(()=>setSaved(false),2500)
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-brand-dark mb-2">Horários disponíveis</h1>
-      <p className="text-sm text-brand-muted mb-6">Configure os dias e horários em que você atende.</p>
-      <div className="bg-white rounded-2xl border border-nude/40 shadow-soft p-6 space-y-3">
-        {DAYS_FULL.map((day,i) => {
-          const a = avail.find(x=>x.day===i)
-          return (
-            <div key={day} className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${a ? 'border-sage-pale bg-sage-glow' : 'border-nude bg-offwhite'}`}>
-              <button onClick={()=>toggleDay(i)} className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${a ? 'bg-sage border-sage text-white' : 'border-nude'}`}>
-                {a && <CheckIcon size={10}/>}
-              </button>
-              <span className="text-sm font-semibold text-brand-dark w-24">{day}</span>
-              {a ? (
-                <div className="flex items-center gap-2 flex-1">
-                  <input type="time" value={a.start} onChange={e=>update(i,'start',e.target.value)} className="border border-nude rounded-lg px-3 py-1.5 text-sm bg-white outline-none focus:border-sage"/>
-                  <span className="text-brand-muted text-sm">até</span>
-                  <input type="time" value={a.end} onChange={e=>update(i,'end',e.target.value)} className="border border-nude rounded-lg px-3 py-1.5 text-sm bg-white outline-none focus:border-sage"/>
-                </div>
-              ) : <span className="text-sm text-brand-muted">Indisponível</span>}
-            </div>
-          )
-        })}
-        <button onClick={save} disabled={saving} className="w-full bg-brand-dark text-cream font-semibold py-3.5 rounded-xl hover:bg-sage transition-colors disabled:opacity-50 mt-2">
-          {saved ? '✓ Salvo!' : saving ? 'Salvando...' : 'Salvar horários'}
+    <div className="anim-fade">
+      <h1 style={{ fontFamily:T.fontSerif, fontSize:28, color:T.dark, marginBottom:6 }}>Horários de atendimento</h1>
+      <p style={{ fontSize:14, color:T.muted, marginBottom:24 }}>Configure os dias e horários disponíveis para agendamento.</p>
+      <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:24 }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:20 }}>
+          {DAYS_FULL.map((day,i) => {
+            const a = avail.find(x=>x.day===i)
+            return (
+              <div key={day} style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 16px', borderRadius:T.r14, border:`2px solid ${a?T.sageP:T.nude}`, background:a?T.sageG:T.off, transition:'all 0.15s' }}>
+                <button type="button" onClick={()=>toggle(i)} style={{ width:22, height:22, borderRadius:T.r4, border:`2px solid ${a?T.sage:T.nude}`, background:a?T.sage:T.white, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0, transition:'all 0.15s' }}>
+                  {a && <span style={{ color:T.cream, fontSize:12, fontWeight:700 }}>✓</span>}
+                </button>
+                <span style={{ fontSize:14, fontWeight:600, color:a?T.dark:T.muted, width:80, flexShrink:0 }}>{day}</span>
+                {a ? (
+                  <div style={{ display:'flex', alignItems:'center', gap:10, flex:1 }}>
+                    <input type="time" value={a.start} onChange={e=>upd(i,'start',e.target.value)} style={{ border:`1px solid ${T.sageP}`, background:T.white, borderRadius:T.r10, padding:'7px 12px', fontSize:13, outline:'none', color:T.dark, fontFamily:T.fontSans }}/>
+                    <span style={{ fontSize:13, color:T.muted }}>até</span>
+                    <input type="time" value={a.end} onChange={e=>upd(i,'end',e.target.value)} style={{ border:`1px solid ${T.sageP}`, background:T.white, borderRadius:T.r10, padding:'7px 12px', fontSize:13, outline:'none', color:T.dark, fontFamily:T.fontSans }}/>
+                  </div>
+                ) : <span style={{ fontSize:13, color:T.muted, fontStyle:'italic' }}>Clique para ativar</span>}
+              </div>
+            )
+          })}
+        </div>
+        <button onClick={save} disabled={saving} style={{ width:'100%', padding:'14px', fontSize:15, fontWeight:700, color:T.cream, background:saved?T.sage:T.dark, border:'none', borderRadius:T.r14, cursor:'pointer', fontFamily:T.fontSans, transition:'background 0.2s' }}>
+          {saved ? '✓ Horários salvos!' : saving ? 'Salvando...' : 'Salvar horários'}
         </button>
       </div>
     </div>
   )
 }
 
-function ProfileTab({ profile, onSave }: { profile: Profile|null, onSave: ()=>void }) {
-  const [form, setForm]   = useState({ name:'', bio:'', whatsapp:'', city:'', state:'', specialties:'', crm_cro_crp:'', instagram:'' })
+function ProfileTab({ profile, onSave }: { profile: Profile|null, onSave:()=>void }) {
+  const [form, setForm] = useState({ name:'', bio:'', whatsapp:'', city:'', state:'', specialties:'', crm:'', instagram:'' })
   const [saving, setSaving] = useState(false)
-  const [saved, setSaved]   = useState(false)
+  const [saved, setSaved] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [photoUrl, setPhotoUrl]   = useState('')
-  const fileRef = useRef<HTMLInputElement>(null)
+  const [photo, setPhoto] = useState('')
+  const fileRef = { current: null as HTMLInputElement|null }
 
   useEffect(() => {
-    if (profile) {
-      setForm({ name:profile.name||'', bio:profile.bio||'', whatsapp:profile.whatsapp||'', city:profile.city||'', state:profile.state||'', specialties:(profile.specialties||[]).join(', '), crm_cro_crp:profile.crm_cro_crp||'', instagram:profile.instagram||'' })
-      setPhotoUrl(profile.photo_url||'')
-    }
+    if (!profile) return
+    setForm({ name:profile.name||'', bio:profile.bio||'', whatsapp:profile.whatsapp||'', city:profile.city||'', state:profile.state||'', specialties:(profile.specialties||[]).join(', '), crm:profile.crm_cro_crp||'', instagram:profile.instagram||'' })
+    setPhoto(profile.photo_url||'')
   }, [profile])
 
-  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function upload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return
     setUploading(true)
     const fd = new FormData(); fd.append('file', file)
-    const res = await fetch('/api/upload', { method:'POST', body: fd })
+    const res = await fetch('/api/upload', { method:'POST', body:fd })
     const { url } = await res.json()
-    if (url) setPhotoUrl(url)
+    if (url) setPhoto(url)
     setUploading(false)
   }
 
   async function save(e: React.FormEvent) {
     e.preventDefault(); if (!profile) return; setSaving(true)
-    await supabase.from('profiles').update({ name:form.name, bio:form.bio, whatsapp:form.whatsapp, city:form.city, state:form.state, crm_cro_crp:form.crm_cro_crp, instagram:form.instagram, specialties:form.specialties.split(',').map(s=>s.trim()).filter(Boolean) }).eq('id', profile.id)
+    await supabase.from('profiles').update({ name:form.name, bio:form.bio, whatsapp:form.whatsapp, city:form.city, state:form.state, crm_cro_crp:form.crm, instagram:form.instagram, specialties:form.specialties.split(',').map(s=>s.trim()).filter(Boolean) }).eq('id',profile.id)
     setSaving(false); setSaved(true); onSave(); setTimeout(()=>setSaved(false),2500)
   }
 
+  function upd(k:string,v:string) { setForm(f=>({...f,[k]:v})) }
+
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-brand-dark mb-2">Meu perfil</h1>
-      <p className="text-sm text-brand-muted mb-6">Essas informações aparecem na sua página pública.</p>
-      
-      {/* PHOTO UPLOAD */}
-      <div className="bg-white rounded-2xl border border-nude/40 shadow-soft p-6 mb-5">
-        <h2 className="font-bold text-brand-dark text-sm mb-4">Foto de perfil</h2>
-        <div className="flex items-center gap-5">
-          <div className="w-20 h-20 rounded-full bg-sage-pale border-2 border-nude overflow-hidden flex items-center justify-center text-3xl">
-            {photoUrl ? <img src={photoUrl} alt="foto" className="w-full h-full object-cover"/> : '👤'}
+    <div className="anim-fade">
+      <h1 style={{ fontFamily:T.fontSerif, fontSize:28, color:T.dark, marginBottom:6 }}>Meu perfil</h1>
+      <p style={{ fontSize:14, color:T.muted, marginBottom:24 }}>Essas informações aparecem na sua página pública.</p>
+
+      {/* Photo */}
+      <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:24, marginBottom:20 }}>
+        <p style={{ fontWeight:700, fontSize:14, color:T.dark, marginBottom:16 }}>Foto de perfil</p>
+        <div style={{ display:'flex', alignItems:'center', gap:20 }}>
+          <div style={{ width:80, height:80, borderRadius:'50%', background:T.sageG, border:`3px solid ${T.sageP}`, overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center', fontSize:32, flexShrink:0 }}>
+            {photo ? <img src={photo} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/> : '👤'}
           </div>
           <div>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload}/>
-            <button onClick={()=>fileRef.current?.click()} disabled={uploading}
-              className="flex items-center gap-2 bg-sage-glow border border-sage-pale text-sage font-semibold text-sm px-4 py-2.5 rounded-xl hover:bg-sage hover:text-cream transition-all disabled:opacity-50">
-              <Upload size={15}/> {uploading ? 'Enviando...' : 'Trocar foto'}
+            <p style={{ fontSize:13, color:T.muted, marginBottom:10 }}>JPG, PNG ou WebP · máx 5MB</p>
+            <input type="file" accept="image/*" style={{ display:'none' }} onChange={upload} ref={el => { fileRef.current = el }}/>
+            <button type="button" onClick={()=>fileRef.current?.click()} disabled={uploading}
+              style={{ display:'flex', alignItems:'center', gap:8, background:T.sageG, border:`1px solid ${T.sageP}`, color:T.sage, borderRadius:T.r12, padding:'9px 16px', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:T.fontSans }}>
+              <Upload size={14}/> {uploading ? 'Enviando...' : 'Trocar foto'}
             </button>
-            <p className="text-xs text-brand-muted mt-1.5">JPG, PNG ou WebP • máx 5MB</p>
           </div>
         </div>
       </div>
 
-      <form onSubmit={save} className="bg-white rounded-2xl border border-nude/40 shadow-soft p-6 space-y-4">
-        <div className="grid md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-semibold text-brand-dark mb-1.5">Nome completo</label>
-            <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} className="w-full border-2 border-nude rounded-xl px-4 py-3 text-sm outline-none focus:border-sage bg-offwhite"/>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-brand-dark mb-1.5">CRM / CRO / CRP</label>
-            <input value={form.crm_cro_crp} onChange={e=>setForm(f=>({...f,crm_cro_crp:e.target.value}))} className="w-full border-2 border-nude rounded-xl px-4 py-3 text-sm outline-none focus:border-sage bg-offwhite" placeholder="CRP 06/12345"/>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-brand-dark mb-1.5">WhatsApp</label>
-            <input value={form.whatsapp} onChange={e=>setForm(f=>({...f,whatsapp:e.target.value}))} className="w-full border-2 border-nude rounded-xl px-4 py-3 text-sm outline-none focus:border-sage bg-offwhite" placeholder="(11) 99999-9999"/>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-brand-dark mb-1.5">Instagram</label>
-            <input value={form.instagram} onChange={e=>setForm(f=>({...f,instagram:e.target.value}))} className="w-full border-2 border-nude rounded-xl px-4 py-3 text-sm outline-none focus:border-sage bg-offwhite" placeholder="@usuario"/>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-brand-dark mb-1.5">Cidade</label>
-            <input value={form.city} onChange={e=>setForm(f=>({...f,city:e.target.value}))} className="w-full border-2 border-nude rounded-xl px-4 py-3 text-sm outline-none focus:border-sage bg-offwhite"/>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-brand-dark mb-1.5">Estado</label>
-            <input value={form.state} maxLength={2} onChange={e=>setForm(f=>({...f,state:e.target.value}))} className="w-full border-2 border-nude rounded-xl px-4 py-3 text-sm outline-none focus:border-sage bg-offwhite" placeholder="SP"/>
-          </div>
+      {/* Form */}
+      <form onSubmit={save} style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:24 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+          {[['name','Nome completo','Dra. Ana Beatriz Silva'],['crm','CRM / CRO / CRP','CRP 06/12345'],['whatsapp','WhatsApp','(11) 99999-9999'],['instagram','Instagram','@usuario'],['city','Cidade','São Paulo'],['state','Estado','SP']].map(([k,l,p])=>(
+            <div key={k} style={{ gridColumn: ['city','state'].includes(k)?undefined:undefined }}>
+              <label style={{ display:'block', fontSize:13, fontWeight:600, color:T.dark, marginBottom:6 }}>{l}</label>
+              <InputF value={(form as any)[k]} onChange={(v:string)=>upd(k,v)} placeholder={p} maxLen={k==='state'?2:undefined}/>
+            </div>
+          ))}
         </div>
-        <div>
-          <label className="block text-sm font-semibold text-brand-dark mb-1.5">Especialidades <span className="text-brand-muted font-normal">(separadas por vírgula)</span></label>
-          <input value={form.specialties} onChange={e=>setForm(f=>({...f,specialties:e.target.value}))} className="w-full border-2 border-nude rounded-xl px-4 py-3 text-sm outline-none focus:border-sage bg-offwhite"/>
+        <div style={{ marginTop:4 }}>
+          <label style={{ display:'block', fontSize:13, fontWeight:600, color:T.dark, marginBottom:6 }}>Especialidades <span style={{ color:T.muted, fontWeight:400 }}>(separadas por vírgula)</span></label>
+          <InputF value={form.specialties} onChange={v=>upd('specialties',v)} placeholder="Ansiedade, Depressão, TCC"/>
         </div>
-        <div>
-          <label className="block text-sm font-semibold text-brand-dark mb-1.5">Bio</label>
-          <textarea rows={4} value={form.bio} onChange={e=>setForm(f=>({...f,bio:e.target.value}))} className="w-full border-2 border-nude rounded-xl px-4 py-3 text-sm outline-none focus:border-sage bg-offwhite resize-none"/>
+        <div style={{ marginTop:4 }}>
+          <label style={{ display:'block', fontSize:13, fontWeight:600, color:T.dark, marginBottom:6 }}>Bio</label>
+          <textarea rows={4} value={form.bio} onChange={e=>upd('bio',e.target.value)}
+            style={{ width:'100%', padding:'12px 16px', fontSize:14, color:T.dark, background:T.off, border:`2px solid ${T.nude}`, borderRadius:T.r12, outline:'none', resize:'vertical', fontFamily:T.fontSans, transition:'border-color 0.2s' }}
+            onFocus={e=>e.target.style.borderColor=T.sage} onBlur={e=>e.target.style.borderColor=T.nude}/>
         </div>
-        <button type="submit" disabled={saving} className="w-full bg-brand-dark text-cream font-semibold py-3.5 rounded-xl hover:bg-sage transition-colors disabled:opacity-50">
+        <button type="submit" disabled={saving} style={{ marginTop:20, width:'100%', padding:'14px', fontSize:15, fontWeight:700, color:T.cream, background:saved?T.sage:T.dark, border:'none', borderRadius:T.r14, cursor:'pointer', fontFamily:T.fontSans, transition:'background 0.2s' }}>
           {saved ? '✓ Perfil salvo!' : saving ? 'Salvando...' : 'Salvar perfil'}
         </button>
       </form>
+
       {profile && (
-        <div className="mt-4 bg-sage-glow border border-sage-pale rounded-xl px-5 py-4 flex items-center justify-between">
+        <div style={{ marginTop:16, background:T.sageG, border:`1px solid ${T.sageP}`, borderRadius:T.r16, padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
           <div>
-            <p className="text-sm font-semibold text-sage">Sua página pública</p>
-            <p className="text-xs text-brand-muted">organizamais.com/p/{profile.slug}</p>
+            <p style={{ fontWeight:600, color:T.sage, fontSize:14, margin:0 }}>Sua página pública</p>
+            <p style={{ fontSize:12, color:T.mid, margin:0 }}>organiza-plus-five.vercel.app/p/{profile.slug}</p>
           </div>
-          <Link href={`/p/${profile.slug}`} target="_blank" className="flex items-center gap-1 text-sage text-sm font-semibold hover:underline">Ver <ExternalLink size={13}/></Link>
+          <Link href={`/p/${profile.slug}`} target="_blank" style={{ display:'flex', alignItems:'center', gap:5, color:T.sage, fontSize:13, fontWeight:600, textDecoration:'none' }}>
+            Ver <ExternalLink size={13}/>
+          </Link>
         </div>
       )}
     </div>
   )
 }
 
+function InputF({ value, onChange, placeholder, maxLen }: { value:string, onChange:(v:string)=>void, placeholder?:string, maxLen?:number }) {
+  const [f,setF] = useState(false)
+  return <input value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} maxLength={maxLen}
+    style={{ width:'100%', padding:'12px 16px', fontSize:14, color:T.dark, background:T.off, border:`2px solid ${f?T.sage:T.nude}`, borderRadius:T.r12, outline:'none', fontFamily:T.fontSans, transition:'border-color 0.2s' }}
+    onFocus={()=>setF(true)} onBlur={()=>setF(false)}/>
+}
+
 export default function Dashboard() {
-  return <Suspense fallback={<div className="min-h-screen bg-offwhite flex items-center justify-center"><div className="font-display text-2xl text-sage animate-pulse">Organiza+</div></div>}><DashboardInner/></Suspense>
+  return <Suspense fallback={<div style={{ minHeight:'100vh', background:T.off }}/>}><DashboardContent/></Suspense>
 }
