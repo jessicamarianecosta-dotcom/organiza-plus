@@ -50,7 +50,7 @@ function CadastroForm() {
         online: form.online, in_person: form.in_person, plan: plano,
       })
       if (profileErr) throw profileErr
-      router.push('/dashboard')
+      router.push('/onboarding')
     } catch(err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro ao criar conta')
       setLoading(false)

@@ -30,6 +30,7 @@ function DashboardInner() {
     if (!user) { router.push('/login'); return }
     const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     if (!p) { router.push('/cadastro'); return }
+    if (!(p as any).onboarding_done) { router.push('/onboarding'); return }
     setProfile(p)
     const { data: a } = await supabase.from('appointments').select('*').eq('professional_id', user.id).order('appt_date',{ascending:true}).order('appt_time',{ascending:true}).limit(100)
     setAppointments(a || [])
