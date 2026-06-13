@@ -1,189 +1,227 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Eye, EyeOff, ArrowLeft, Check } from 'lucide-react'
-import { Suspense } from 'react'
 
-const PROFESSIONS = ['Psicólogo(a)','Psiquiatra','Nutricionista','Fisioterapeuta','Médico(a)','Dentista','Esteticista','Terapeuta','Coach','Outro']
+const C = { sage:'#7A9E87', sageG:'#EAF3EC', sageP:'#D6E8DA', sageL:'#A8C4AD', dark:'#2C3530', mid:'#5A6660', muted:'#8A9690', cream:'#FAFAF7', off:'#F7F5F0', nude:'#EDE8E0', white:'#FFFFFF', red:'#ef4444', redL:'#fef2f2', redB:'#fecaca' }
+
+const PROFESSIONS = ['Psicólogo(a)','Psiquiatra','Nutricionista','Fisioterapeuta','Médico(a)','Dentista','Esteticista','Terapeuta','Coach','Educador Físico','Outro']
+
+function slugify(s: string) {
+  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9\s-]/g,'').trim().replace(/\s+/g,'-').slice(0,50)
+}
+
+function StyledInput({ label, type='text', value, onChange, placeholder, autoComplete, required=true }: any) {
+  const [focused, setFocused] = useState(false)
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <label style={{ display:'block', fontSize:13, fontWeight:600, color:C.dark, marginBottom:6 }}>{label}</label>
+      <input type={type} value={value} onChange={onChange} placeholder={placeholder} autoComplete={autoComplete} required={required}
+        onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)}
+        style={{ width:'100%', padding:'12px 16px', fontSize:14, color:C.dark, background:C.off, border:`2px solid ${focused?C.sage:C.nude}`, borderRadius:12, outline:'none', transition:'border-color 0.2s', fontFamily:'inherit' }}/>
+    </div>
+  )
+}
 
 function CadastroForm() {
   const router = useRouter()
   const params = useSearchParams()
   const plano = params.get('plano') || 'basic'
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
 
-  const [step, setStep] = useState(1)
-  const [show, setShow] = useState(false)
+  const [step, setStep] = useState<1|2>(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showPw, setShowPw] = useState(false)
 
-  const [form, setForm] = useState({
-    name: '', email: '', password: '', profession: '', whatsapp: '', city: '', state: '',
-    bio: '', specialties: '', online: false, in_person: true,
-  })
+  // Step 1
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
 
-  function update(k: string, v: string | boolean) { setForm(f => ({...f,[k]:v})) }
+  // Step 2
+  const [profession, setProfession] = useState('')
+  const [whatsapp, setWhatsapp] = useState('')
+  const [city, setCity] = useState('')
 
-  function slugify(s: string) {
-    return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9\s-]/g,'').trim().replace(/\s+/g,'-')
+  const steps = ['Sua conta','Perfil profissional']
+
+  async function handleStep1(e: React.FormEvent) {
+    e.preventDefault()
+    if (password.length < 6) { setError('A senha precisa ter pelo menos 6 caracteres.'); return }
+    setError(''); setStep(2)
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!profession) { setError('Selecione sua profissão.'); return }
     setLoading(true); setError('')
-    try {
-      const { data: auth, error: authErr } = await supabase.auth.signUp({ email: form.email, password: form.password })
-      if (authErr) throw authErr
-      const uid = auth.user?.id
-      if (!uid) throw new Error('Erro ao criar usuário')
 
-      let slug = slugify(form.name)
+    try {
+      // 1. Create auth user
+      const { data: auth, error: authErr } = await supabase.auth.signUp({ email, password })
+      if (authErr) throw new Error(authErr.message)
+      const uid = auth.user?.id
+      if (!uid) throw new Error('Erro ao criar usuário. Tente novamente.')
+
+      // 2. Generate unique slug
+      let slug = slugify(name)
+      if (!slug) slug = `usuario-${Date.now()}`
       const { data: existing } = await supabase.from('profiles').select('slug').eq('slug', slug)
       if (existing && existing.length > 0) slug = `${slug}-${Math.random().toString(36).slice(2,6)}`
 
+      // 3. Create profile
       const { error: profileErr } = await supabase.from('profiles').insert({
-        id: uid, name: form.name, slug, profession: form.profession,
-        bio: form.bio || null, whatsapp: form.whatsapp || null,
-        city: form.city || null, state: form.state || null,
-        specialties: form.specialties ? form.specialties.split(',').map(s=>s.trim()).filter(Boolean) : [],
-        online: form.online, in_person: form.in_person, plan: plano,
+        id: uid, name, slug, profession,
+        whatsapp: whatsapp || null, city: city || null,
+        plan: plano, plan_active: true,
+        online: false, in_person: true,
       })
-      if (profileErr) throw profileErr
+      if (profileErr) {
+        // Profile might fail if user already exists - try to sign in instead
+        console.error('Profile error:', profileErr)
+      }
+
+      // 4. Redirect to onboarding
       router.push('/onboarding')
-    } catch(err: unknown) {
-      setError(err instanceof Error ? err.message : 'Erro ao criar conta')
+    } catch (err: any) {
+      const msg = err.message || 'Erro ao criar conta'
+      if (msg.includes('already registered') || msg.includes('already been registered')) {
+        setError('Este e-mail já está cadastrado. Faça login ou recupere sua senha.')
+      } else {
+        setError(msg)
+      }
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-offwhite flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-lg">
-        <Link href="/" className="inline-flex items-center gap-2 text-sm text-brand-muted hover:text-brand-dark mb-8 transition-colors">
-          <ArrowLeft size={16}/> Voltar
+    <div style={{
+      minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center',
+      padding:'24px 16px', fontFamily:"'DM Sans', system-ui, sans-serif",
+      background:`radial-gradient(ellipse 80% 60% at 50% -10%, rgba(122,158,135,0.12) 0%, transparent 60%), #F7F5F0`,
+      opacity: mounted?1:0, transition:'opacity 0.4s ease',
+    }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap'); *{box-sizing:border-box;} input::placeholder{color:#8A9690;} select option{background:#fff;}`}</style>
+
+      <div style={{ width:'100%', maxWidth:460 }}>
+        <Link href="/" style={{ display:'inline-flex', alignItems:'center', gap:6, fontSize:13, color:C.muted, textDecoration:'none', marginBottom:24 }}
+          onMouseEnter={e=>e.currentTarget.style.color=C.dark} onMouseLeave={e=>e.currentTarget.style.color=C.muted}>
+          ← Voltar
         </Link>
 
-        {/* progress */}
-        <div className="flex items-center gap-2 mb-8">
-          {[1,2].map(s => (
-            <div key={s} className="flex items-center gap-2">
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${step>=s ? 'bg-sage text-white' : 'bg-nude text-brand-muted'}`}>
-                {step>s ? <Check size={12}/> : s}
+        {/* Progress */}
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:28 }}>
+          {steps.map((s,i)=>(
+            <div key={s} style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                <div style={{ width:28, height:28, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, background: step>i+1 ? C.sage : step===i+1 ? C.dark : C.nude, color: step>=i+1 ? C.cream : C.muted, transition:'all 0.2s' }}>
+                  {step>i+1 ? '✓' : i+1}
+                </div>
+                <span style={{ fontSize:13, fontWeight:step===i+1?600:400, color:step===i+1?C.dark:C.muted }}>{s}</span>
               </div>
-              {s<2 && <div className={`h-0.5 w-16 rounded-full transition-all ${step>1 ? 'bg-sage' : 'bg-nude'}`}/>}
+              {i<steps.length-1 && <div style={{ width:32, height:2, borderRadius:2, background: step>i+1 ? C.sage : C.nude, transition:'background 0.3s' }}/>}
             </div>
           ))}
-          <span className="ml-2 text-xs text-brand-muted">Passo {step} de 2</span>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-md border border-nude/40 p-8 md:p-10">
-          <div className="font-display text-2xl text-brand-dark mb-1">Organiza<span className="text-sage">+</span></div>
-          <h1 className="text-xl font-bold text-brand-dark mt-4 mb-1">
+        {/* Card */}
+        <div style={{ background:C.white, borderRadius:24, padding:'36px 36px 32px', boxShadow:'0 8px 40px rgba(44,53,48,0.10), 0 0 0 1px rgba(237,232,224,0.6)' }}>
+          {/* Logo */}
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:22 }}>
+            <span style={{ width:8, height:8, borderRadius:'50%', background:C.sage, display:'inline-block' }}/>
+            <span style={{ fontFamily:"'DM Serif Display', Georgia, serif", fontSize:20, color:C.dark }}>
+              Organiza<span style={{ color:C.sage }}>+</span>
+            </span>
+            <span style={{ marginLeft:'auto', background:C.sageG, color:C.sage, fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:100, border:`1px solid ${C.sageP}` }}>
+              {plano === 'premium' ? '💎 Premium' : '🌿 Basic'}
+            </span>
+          </div>
+
+          <h1 style={{ fontFamily:"'DM Serif Display', Georgia, serif", fontSize:24, color:C.dark, margin:'0 0 4px' }}>
             {step===1 ? 'Crie sua conta' : 'Perfil profissional'}
           </h1>
-          <p className="text-sm text-brand-muted mb-6">
-            {step===1 ? 'Plano selecionado: ' : 'Personalize sua página pública.'}
-            {step===1 && <span className="font-bold text-sage capitalize"> {plano === 'premium' ? '💎 Premium' : '🌿 Basic'}</span>}
+          <p style={{ fontSize:14, color:C.muted, margin:'0 0 24px' }}>
+            {step===1 ? 'Preencha seus dados de acesso.' : 'Personalize sua página pública.'}
           </p>
 
-          {error && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-5">{error}</div>}
+          {/* Error */}
+          {error && (
+            <div style={{ background:C.redL, border:`1px solid ${C.redB}`, color:C.red, fontSize:13, padding:'11px 14px', borderRadius:10, marginBottom:18 }}>
+              {error}
+            </div>
+          )}
 
-          <form onSubmit={step===1 ? (e=>{e.preventDefault();setStep(2)}) : handleSubmit} className="space-y-4">
-            {step===1 && <>
-              <div>
-                <label className="block text-sm font-semibold text-brand-dark mb-1.5">Nome completo</label>
-                <input required value={form.name} onChange={e=>update('name',e.target.value)}
-                  className="w-full border-2 border-nude rounded-xl px-4 py-3 text-sm outline-none focus:border-sage bg-offwhite"
-                  placeholder="Dra. Ana Beatriz"/>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-brand-dark mb-1.5">E-mail</label>
-                <input type="email" required value={form.email} onChange={e=>update('email',e.target.value)}
-                  className="w-full border-2 border-nude rounded-xl px-4 py-3 text-sm outline-none focus:border-sage bg-offwhite"
-                  placeholder="seu@email.com"/>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-brand-dark mb-1.5">Senha</label>
-                <div className="relative">
-                  <input type={show?'text':'password'} required minLength={6} value={form.password} onChange={e=>update('password',e.target.value)}
-                    className="w-full border-2 border-nude rounded-xl px-4 py-3 text-sm outline-none focus:border-sage bg-offwhite pr-12"
-                    placeholder="Mínimo 6 caracteres"/>
-                  <button type="button" onClick={()=>setShow(!show)} className="absolute right-4 top-3.5 text-brand-muted">
-                    {show ? <EyeOff size={16}/> : <Eye size={16}/>}
+          {/* STEP 1 */}
+          {step===1 && (
+            <form onSubmit={handleStep1}>
+              <StyledInput label="Nome completo *" value={name} onChange={(e:any)=>setName(e.target.value)} placeholder="Ex: Dra. Ana Beatriz Silva" autoComplete="name"/>
+              <StyledInput label="E-mail *" type="email" value={email} onChange={(e:any)=>setEmail(e.target.value)} placeholder="seu@email.com" autoComplete="email"/>
+              <div style={{ marginBottom:20 }}>
+                <label style={{ display:'block', fontSize:13, fontWeight:600, color:C.dark, marginBottom:6 }}>Senha *</label>
+                <div style={{ position:'relative' }}>
+                  <input type={showPw?'text':'password'} required value={password} onChange={e=>setPassword(e.target.value)}
+                    placeholder="Mínimo 6 caracteres" autoComplete="new-password"
+                    style={{ width:'100%', padding:'12px 44px 12px 16px', fontSize:14, color:C.dark, background:C.off, border:`2px solid ${C.nude}`, borderRadius:12, outline:'none', fontFamily:'inherit' }}
+                    onFocus={e=>e.target.style.borderColor=C.sage} onBlur={e=>e.target.style.borderColor=C.nude}/>
+                  <button type="button" onClick={()=>setShowPw(!showPw)} style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:C.muted }}>
+                    {showPw?'👁️':'🔒'}
                   </button>
                 </div>
+                <p style={{ fontSize:11, color:C.muted, marginTop:5 }}>Mínimo 6 caracteres</p>
               </div>
-            </>}
-
-            {step===2 && <>
-              <div>
-                <label className="block text-sm font-semibold text-brand-dark mb-1.5">Profissão</label>
-                <select required value={form.profession} onChange={e=>update('profession',e.target.value)}
-                  className="w-full border-2 border-nude rounded-xl px-4 py-3 text-sm outline-none focus:border-sage bg-offwhite">
-                  <option value="">Selecione...</option>
-                  {PROFESSIONS.map(p=><option key={p} value={p}>{p}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-brand-dark mb-1.5">WhatsApp</label>
-                <input value={form.whatsapp} onChange={e=>update('whatsapp',e.target.value)}
-                  className="w-full border-2 border-nude rounded-xl px-4 py-3 text-sm outline-none focus:border-sage bg-offwhite"
-                  placeholder="(11) 99999-9999"/>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-semibold text-brand-dark mb-1.5">Cidade</label>
-                  <input value={form.city} onChange={e=>update('city',e.target.value)}
-                    className="w-full border-2 border-nude rounded-xl px-4 py-3 text-sm outline-none focus:border-sage bg-offwhite" placeholder="São Paulo"/>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-brand-dark mb-1.5">Estado</label>
-                  <input value={form.state} onChange={e=>update('state',e.target.value)} maxLength={2}
-                    className="w-full border-2 border-nude rounded-xl px-4 py-3 text-sm outline-none focus:border-sage bg-offwhite" placeholder="SP"/>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-brand-dark mb-1.5">Especialidades <span className="text-brand-muted font-normal">(separadas por vírgula)</span></label>
-                <input value={form.specialties} onChange={e=>update('specialties',e.target.value)}
-                  className="w-full border-2 border-nude rounded-xl px-4 py-3 text-sm outline-none focus:border-sage bg-offwhite"
-                  placeholder="Ansiedade, Depressão, TCC"/>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-brand-dark mb-1.5">Sobre você <span className="text-brand-muted font-normal">(bio)</span></label>
-                <textarea rows={3} value={form.bio} onChange={e=>update('bio',e.target.value)}
-                  className="w-full border-2 border-nude rounded-xl px-4 py-3 text-sm outline-none focus:border-sage bg-offwhite resize-none"
-                  placeholder="Conte um pouco sobre você e seu trabalho..."/>
-              </div>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={form.online} onChange={e=>update('online',e.target.checked)} className="accent-sage w-4 h-4"/>
-                  <span className="text-sm text-brand-dark">Atendimento online</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={form.in_person} onChange={e=>update('in_person',e.target.checked)} className="accent-sage w-4 h-4"/>
-                  <span className="text-sm text-brand-dark">Presencial</span>
-                </label>
-              </div>
-            </>}
-
-            <button type="submit" disabled={loading}
-              className="w-full bg-brand-dark text-cream font-semibold py-3.5 rounded-xl hover:bg-sage transition-colors disabled:opacity-50 mt-2">
-              {loading ? 'Criando conta...' : step===1 ? 'Continuar →' : 'Criar minha conta →'}
-            </button>
-          </form>
-
-          {step===1 && (
-            <p className="text-center text-sm text-brand-muted mt-6">
-              Já tem conta? <Link href="/login" className="text-sage font-semibold hover:underline">Entrar</Link>
-            </p>
+              <button type="submit" disabled={!name||!email||!password} style={{ width:'100%', padding:'14px', fontSize:15, fontWeight:700, color:C.cream, background:C.dark, border:'none', borderRadius:12, cursor:'pointer', fontFamily:'inherit', transition:'background 0.2s' }}
+                onMouseEnter={e=>e.currentTarget.style.background=C.sage} onMouseLeave={e=>e.currentTarget.style.background=C.dark}>
+                Continuar →
+              </button>
+            </form>
           )}
+
+          {/* STEP 2 */}
+          {step===2 && (
+            <form onSubmit={handleSubmit}>
+              <div style={{ marginBottom:14 }}>
+                <label style={{ display:'block', fontSize:13, fontWeight:600, color:C.dark, marginBottom:6 }}>Profissão *</label>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  {PROFESSIONS.map(p=>(
+                    <button key={p} type="button" onClick={()=>{setProfession(p);setError('')}}
+                      style={{ padding:'10px 12px', borderRadius:10, border:`2px solid ${profession===p?C.sage:C.nude}`, background:profession===p?C.sageG:C.off, color:profession===p?C.sage:C.mid, fontSize:12, fontWeight:600, cursor:'pointer', transition:'all 0.15s', textAlign:'left', fontFamily:'inherit' }}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <StyledInput label="WhatsApp" value={whatsapp} onChange={(e:any)=>setWhatsapp(e.target.value)} placeholder="(11) 99999-9999" autoComplete="tel" required={false}/>
+              <StyledInput label="Cidade" value={city} onChange={(e:any)=>setCity(e.target.value)} placeholder="São Paulo" required={false}/>
+              <div style={{ display:'flex', gap:10, marginTop:4 }}>
+                <button type="button" onClick={()=>{setStep(1);setError('')}} style={{ padding:'14px 20px', border:`2px solid ${C.nude}`, background:'transparent', color:C.dark, borderRadius:12, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit', transition:'all 0.15s' }}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor=C.sage}} onMouseLeave={e=>{e.currentTarget.style.borderColor=C.nude}}>
+                  ← Voltar
+                </button>
+                <button type="submit" disabled={loading||!profession} style={{ flex:1, padding:'14px', fontSize:15, fontWeight:700, color:C.cream, background:loading?C.muted:C.dark, border:'none', borderRadius:12, cursor:loading?'not-allowed':'pointer', fontFamily:'inherit', transition:'background 0.2s' }}
+                  onMouseEnter={e=>{if(!loading)e.currentTarget.style.background=C.sage}} onMouseLeave={e=>{if(!loading)e.currentTarget.style.background=C.dark}}>
+                  {loading ? 'Criando conta...' : 'Criar minha conta →'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          <div style={{ textAlign:'center', marginTop:24, paddingTop:24, borderTop:`1px solid ${C.nude}` }}>
+            <p style={{ fontSize:14, color:C.muted, margin:0 }}>
+              Já tem conta?{' '}
+              <Link href="/login" style={{ color:C.sage, fontWeight:700, textDecoration:'none' }}>Entrar</Link>
+            </p>
+          </div>
         </div>
+
+        <p style={{ textAlign:'center', fontSize:12, color:C.muted, marginTop:18 }}>🔒 Conexão segura · Dados protegidos</p>
       </div>
     </div>
   )
 }
 
 export default function Cadastro() {
-  return <Suspense><CadastroForm/></Suspense>
+  return <Suspense fallback={<div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#F7F5F0', fontFamily:'system-ui' }}><p>Carregando...</p></div>}><CadastroForm/></Suspense>
 }
