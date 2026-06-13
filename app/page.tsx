@@ -52,9 +52,9 @@ export default function Home() {
           </Link>
         </div>
         {/* Mobile: Entrar + Começar */}
-        <div className="flex md:hidden items-center gap-2">
-          <Link href="/login" className="text-sm font-medium text-brand-mid px-3 py-2">Entrar</Link>
-          <Link href="/cadastro" className="bg-brand-dark text-cream text-xs font-semibold px-3 py-2 rounded-xl">Começar</Link>
+        <div className="flex md:hidden items-center gap-3">
+          <Link href="/login" className="text-sm font-semibold text-brand-mid">Entrar</Link>
+          <Link href="/cadastro" className="bg-brand-dark text-cream text-sm font-semibold px-4 py-2 rounded-xl">Começar →</Link>
         </div>
       </nav>
 
@@ -94,64 +94,66 @@ export default function Home() {
           <span>+1.200 profissionais já usam</span>
         </div>
 
-        {/* DASHBOARD PREVIEW — clean, no nesting issues */}
-        <div className="w-full max-w-3xl rounded-2xl shadow-lg border border-nude/40 overflow-hidden bg-white">
+        {/* DASHBOARD PREVIEW — 100% inline styles */}
+        <div style={{width:'100%',maxWidth:720,borderRadius:16,boxShadow:'0 20px 60px rgba(44,53,48,0.14)',border:'1px solid #EDE8E0',overflow:'hidden',background:'#fff'}}>
           {/* browser bar */}
-          <div className="bg-offwhite px-4 py-2.5 flex items-center gap-3 border-b border-nude">
-            <div className="flex gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-red-400"/>
-              <div className="w-3 h-3 rounded-full bg-yellow-400"/>
-              <div className="w-3 h-3 rounded-full bg-sage-light"/>
+          <div style={{background:'#F7F5F0',padding:'10px 16px',display:'flex',alignItems:'center',gap:10,borderBottom:'1px solid #EDE8E0'}}>
+            <div style={{display:'flex',gap:5}}>
+              <div style={{width:11,height:11,borderRadius:'50%',background:'#ff6b6b'}}/>
+              <div style={{width:11,height:11,borderRadius:'50%',background:'#ffd166'}}/>
+              <div style={{width:11,height:11,borderRadius:'50%',background:'#A8C4AD'}}/>
             </div>
-            <div className="flex-1 bg-nude rounded-md px-3 py-1.5 text-xs text-brand-muted flex items-center gap-1">
+            <div style={{flex:1,background:'#EDE8E0',borderRadius:6,padding:'5px 12px',fontSize:11,color:'#8A9690'}}>
               🔒 organizamais.com/dashboard
             </div>
           </div>
           {/* dashboard body */}
-          <div className="flex">
-            {/* sidebar - hidden on small */}
-            <div className="hidden sm:flex w-44 bg-brand-dark flex-col py-4 gap-1 shrink-0">
-              <div className="font-display text-base text-cream px-4 pb-4 border-b border-white/10 mb-1">
-                Organiza<span className="text-sage-light">+</span>
+          <div style={{display:'flex'}}>
+            {/* sidebar */}
+            <div style={{width:160,background:'#2C3530',display:'flex',flexDirection:'column',padding:'16px 0',flexShrink:0}}>
+              <div style={{fontFamily:'Georgia,serif',fontSize:16,color:'#FAFAF7',padding:'0 16px 14px',borderBottom:'1px solid rgba(255,255,255,0.1)',marginBottom:6}}>
+                Organiza<span style={{color:'#A8C4AD'}}>+</span>
               </div>
-              {['📊 Dashboard','📅 Agenda','👥 Clientes','🌐 Minha página','⚙️ Config.'].map((it,i)=>(
-                <div key={it} className={`flex items-center gap-2 mx-2 px-2 py-2 rounded-lg text-xs font-medium ${i===0 ? 'bg-sage/20 text-sage-light' : 'text-white/30'}`}>{it}</div>
+              {[['📊','Dashboard',true],['📅','Agenda',false],['👥','Clientes',false],['🌐','Página',false],['⚙️','Config.',false]].map(([ic,lb,ac])=>(
+                <div key={lb as string} style={{display:'flex',alignItems:'center',gap:8,margin:'2px 8px',padding:'7px 10px',borderRadius:8,fontSize:11,fontWeight:500,background:ac?'rgba(122,158,135,0.2)':'transparent',color:ac?'#A8C4AD':'rgba(255,255,255,0.3)'}}>
+                  {ic} {lb}
+                </div>
               ))}
             </div>
-            {/* main content */}
-            <div className="flex-1 bg-offwhite p-4 min-w-0">
-              <div className="flex justify-between items-center mb-4">
+            {/* main */}
+            <div style={{flex:1,background:'#F7F5F0',padding:16,minWidth:0}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:14}}>
                 <div>
-                  <p className="font-semibold text-sm text-brand-dark">Olá, Dra. Ana 👋</p>
-                  <p className="text-xs text-brand-muted">Sexta-feira, 13 de junho</p>
+                  <p style={{fontWeight:700,fontSize:13,color:'#2C3530',margin:0}}>Olá, Dra. Ana 👋</p>
+                  <p style={{fontSize:11,color:'#8A9690',margin:'2px 0 0'}}>Sexta-feira, 13 de junho</p>
                 </div>
-                <span className="bg-sage-glow text-sage text-xs font-bold px-2.5 py-1 rounded-full border border-sage-pale">✦ Premium</span>
+                <span style={{background:'#EAF3EC',color:'#7A9E87',fontSize:10,fontWeight:700,padding:'4px 10px',borderRadius:100,border:'1px solid #D6E8DA'}}>✦ Premium</span>
               </div>
-              {/* stat cards */}
-              <div className="grid grid-cols-3 gap-2 mb-3">
+              {/* cards */}
+              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:12}}>
                 {[['Hoje','8','↑ +3'],['Clientes','42','↑ +12'],['Pendentes','3','⏳']].map(([l,v,s])=>(
-                  <div key={l} className="bg-white rounded-xl p-3 border border-nude/40 shadow-soft">
-                    <p className="text-[9px] font-bold text-brand-muted uppercase tracking-wider">{l}</p>
-                    <p className="text-xl font-bold text-brand-dark mt-0.5">{v}</p>
-                    <p className="text-[10px] text-sage">{s}</p>
+                  <div key={l} style={{background:'#fff',borderRadius:10,padding:'10px 12px',border:'1px solid #EDE8E0',boxShadow:'0 2px 8px rgba(44,53,48,0.06)'}}>
+                    <p style={{fontSize:9,fontWeight:700,color:'#8A9690',textTransform:'uppercase',letterSpacing:'0.06em',margin:0}}>{l}</p>
+                    <p style={{fontSize:22,fontWeight:800,color:'#2C3530',margin:'3px 0 1px'}}>{v}</p>
+                    <p style={{fontSize:10,color:'#7A9E87',margin:0}}>{s}</p>
                   </div>
                 ))}
               </div>
               {/* appointments */}
-              <div className="bg-white rounded-xl border border-nude/40 overflow-hidden">
-                <div className="px-3 py-2 border-b border-nude flex justify-between">
-                  <span className="text-[10px] font-bold text-brand-dark">Próximos agendamentos</span>
-                  <span className="text-[10px] font-bold text-sage bg-sage-glow px-2 py-0.5 rounded-full">Hoje</span>
+              <div style={{background:'#fff',borderRadius:10,border:'1px solid #EDE8E0',overflow:'hidden'}}>
+                <div style={{padding:'8px 12px',borderBottom:'1px solid #EDE8E0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <span style={{fontSize:10,fontWeight:700,color:'#2C3530'}}>Próximos agendamentos</span>
+                  <span style={{fontSize:9,fontWeight:700,color:'#7A9E87',background:'#EAF3EC',padding:'2px 8px',borderRadius:100}}>Hoje</span>
                 </div>
-                {[['09:00','Mariana S.','Consulta inicial','confirmed'],['10:30','Carlos M.','Retorno','confirmed'],['14:00','Laura P.','Avaliação','pending']].map(([t,n,tp,s])=>(
-                  <div key={n} className="flex items-center gap-2 px-3 py-2.5 border-b border-nude/20 last:border-0">
-                    <div className="bg-sage-glow text-sage text-[10px] font-bold px-2 py-1 rounded-lg shrink-0">{t}</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-brand-dark truncate">{n}</p>
-                      <p className="text-[10px] text-brand-muted">{tp}</p>
+                {[['09:00','Mariana S.','Consulta inicial',true],['10:30','Carlos M.','Retorno',true],['14:00','Laura P.','Avaliação',false]].map(([t,n,tp,ok])=>(
+                  <div key={n as string} style={{display:'flex',alignItems:'center',gap:8,padding:'9px 12px',borderBottom:'1px solid rgba(237,232,224,0.5)'}}>
+                    <div style={{background:'#EAF3EC',color:'#7A9E87',fontSize:10,fontWeight:700,padding:'4px 8px',borderRadius:6,flexShrink:0}}>{t}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <p style={{fontSize:11,fontWeight:600,color:'#2C3530',margin:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{n}</p>
+                      <p style={{fontSize:10,color:'#8A9690',margin:0}}>{tp}</p>
                     </div>
-                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${s==='confirmed' ? 'bg-sage/10 text-sage' : 'bg-amber-50 text-amber-600'}`}>
-                      {s==='confirmed' ? 'Confirmado' : 'Pendente'}
+                    <span style={{fontSize:9,fontWeight:700,padding:'2px 7px',borderRadius:100,flexShrink:0,background:ok?'rgba(122,158,135,0.12)':'rgba(251,191,36,0.15)',color:ok?'#7A9E87':'#d97706'}}>
+                      {ok?'Confirmado':'Pendente'}
                     </span>
                   </div>
                 ))}
