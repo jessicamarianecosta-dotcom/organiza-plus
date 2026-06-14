@@ -131,6 +131,11 @@ function DashboardContent() {
 
         {/* Footer */}
         <div style={{ padding:'10px 10px 20px', borderTop:'1px solid rgba(255,255,255,0.06)', display:'flex', flexDirection:'column', gap:1 }}>
+          <Link href="/dashboard/agenda" style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderRadius:T.r12, fontSize:12, fontWeight:500, color:'rgba(255,255,255,0.32)', textDecoration:'none', transition:'all 0.15s' }}
+            onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.05)';e.currentTarget.style.color=T.sageL}}
+            onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='rgba(255,255,255,0.32)'}}>
+            <Calendar size={14}/> Agenda & Workspace
+          </Link>
           <Link href="/dashboard/analytics" style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderRadius:T.r12, fontSize:12, fontWeight:500, color:'rgba(255,255,255,0.32)', textDecoration:'none', transition:'all 0.15s' }}
             onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.05)';e.currentTarget.style.color=T.sageL}}
             onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='rgba(255,255,255,0.32)'}}>
