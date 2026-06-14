@@ -1,482 +1,510 @@
 'use client'
 import Link from 'next/link'
-import { useState, useEffect, useRef } from 'react'
-import { ArrowRight, Check, Menu, X, Star, Zap, Globe, Bell, Shield, Clock, Users, BarChart2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ArrowRight, Check, Star, Menu, X, Zap, Shield } from 'lucide-react'
+import { T, GlobalStyles } from '@/lib/ds'
 
 export default function Home() {
-  const [scrolled, setScrolled] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [visible, setVisible] = useState(false)
+  const [scrolled, setScrolled]   = useState(false)
+  const [menuOpen, setMenuOpen]   = useState(false)
+  const [isMobile, setIsMobile]   = useState(false)
+  const [mounted, setMounted]     = useState(false)
 
   useEffect(() => {
-    setVisible(true)
-    const fn = () => setScrolled(window.scrollY > 8)
-    window.addEventListener('scroll', fn)
-    return () => window.removeEventListener('scroll', fn)
+    setMounted(true)
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    const onScroll = () => setScrolled(window.scrollY > 8)
+    window.addEventListener('scroll', onScroll)
+    window.addEventListener('resize', check)
+    return () => { window.removeEventListener('scroll', onScroll); window.removeEventListener('resize', check) }
   }, [])
 
-  const navStyle = {
-    position: 'fixed' as const, top: 0, left: 0, right: 0, zIndex: 100,
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '0 40px', height: 64,
-    background: scrolled ? 'rgba(250,250,247,0.95)' : 'rgba(250,250,247,0.7)',
-    backdropFilter: 'blur(20px)',
-    borderBottom: scrolled ? '1px solid #EDE8E0' : '1px solid transparent',
-    boxShadow: scrolled ? '0 4px 24px rgba(44,53,48,0.06)' : 'none',
-    transition: 'all 0.3s ease',
-  }
-
   return (
-    <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: '#FAFAF7', color: '#2C3530', overflowX: 'hidden', WebkitFontSmoothing: 'antialiased' }}>
+    <div style={{ fontFamily:T.fontSans, background:T.cream, color:T.dark, overflowX:'hidden', WebkitFontSmoothing:'antialiased' }}>
+      <GlobalStyles/>
+      <style>{`
+        @keyframes fadeUp { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes float1 { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+        @keyframes float2 { 0%,100%{transform:translateY(0)} 50%{transform:translateY(8px)} }
+        .fade-up { animation: fadeUp 0.6s ease both; }
+        .fade-up-d1 { animation: fadeUp 0.6s 0.12s ease both; }
+        .fade-up-d2 { animation: fadeUp 0.6s 0.24s ease both; }
+        a,button { -webkit-tap-highlight-color: transparent; }
+        * { box-sizing: border-box; }
+      `}</style>
 
-      {/* ─── NAV ─── */}
-      <nav style={navStyle}>
-        <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#7A9E87', display: 'inline-block' }}/>
-          <span style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 20, color: '#2C3530' }}>
-            Organiza<span style={{ color: '#7A9E87' }}>+</span>
+      {/* ══════════════════════════ NAV ══════════════════════════ */}
+      <nav style={{
+        position:'fixed', top:0, left:0, right:0, zIndex:200,
+        padding: isMobile ? '0 16px' : '0 40px',
+        height:60, display:'flex', alignItems:'center', justifyContent:'space-between',
+        background: scrolled||menuOpen ? 'rgba(250,250,247,0.97)' : 'rgba(250,250,247,0.75)',
+        backdropFilter:'blur(20px)',
+        borderBottom: scrolled||menuOpen ? `1px solid ${T.nude}` : '1px solid transparent',
+        boxShadow: scrolled ? T.shadowSm : 'none',
+        transition:'all 0.3s ease',
+      }}>
+        {/* Logo */}
+        <Link href="/" style={{ display:'flex', alignItems:'center', gap:8, textDecoration:'none', flexShrink:0 }}>
+          <div style={{ width:8, height:8, borderRadius:'50%', background:T.sage }}/>
+          <span style={{ fontFamily:T.fontSerif, fontSize:19, color:T.dark }}>
+            Organiza<span style={{ color:T.sage }}>+</span>
           </span>
-        </a>
+        </Link>
 
         {/* Desktop nav */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 36 }} className="hidden md:flex">
-          {[['#como-funciona','Como funciona'],['#funcionalidades','Funcionalidades'],['#planos','Planos']].map(([h,l])=>(
-            <a key={h} href={h} style={{ fontSize: 14, fontWeight: 500, color: '#5A6660', textDecoration: 'none' }}
-              onMouseEnter={e=>(e.target as HTMLElement).style.color='#2C3530'}
-              onMouseLeave={e=>(e.target as HTMLElement).style.color='#5A6660'}>{l}</a>
-          ))}
-          <Link href="/login" style={{ fontSize: 14, fontWeight: 500, color: '#5A6660', textDecoration: 'none' }}>Entrar</Link>
-          <Link href="/cadastro" style={{ background: '#2C3530', color: '#FAFAF7', padding: '10px 22px', borderRadius: 12, fontSize: 14, fontWeight: 600, textDecoration: 'none', transition: 'background 0.2s' }}
-            onMouseEnter={e=>e.currentTarget.style.background='#7A9E87'}
-            onMouseLeave={e=>e.currentTarget.style.background='#2C3530'}>
-            Começar agora →
-          </Link>
-        </div>
+        {!isMobile && (
+          <div style={{ display:'flex', alignItems:'center', gap:32 }}>
+            {[['#como-funciona','Como funciona'],['#funcionalidades','Funcionalidades'],['#planos','Planos']].map(([h,l])=>(
+              <a key={h} href={h} style={{ fontSize:14, fontWeight:500, color:T.mid, textDecoration:'none', transition:'color 0.15s' }}
+                onMouseEnter={e=>e.currentTarget.style.color=T.dark} onMouseLeave={e=>e.currentTarget.style.color=T.mid}>{l}</a>
+            ))}
+            <Link href="/login" style={{ fontSize:14, fontWeight:500, color:T.mid, textDecoration:'none', transition:'color 0.15s' }}
+              onMouseEnter={e=>e.currentTarget.style.color=T.dark} onMouseLeave={e=>e.currentTarget.style.color=T.mid}>Entrar</Link>
+            <Link href="/cadastro" style={{ background:T.dark, color:T.cream, padding:'9px 20px', borderRadius:T.r12, fontSize:14, fontWeight:700, textDecoration:'none', transition:'background 0.2s' }}
+              onMouseEnter={e=>e.currentTarget.style.background=T.sage} onMouseLeave={e=>e.currentTarget.style.background=T.dark}>
+              Começar agora →
+            </Link>
+          </div>
+        )}
 
         {/* Mobile nav */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }} className="flex md:hidden">
-          <Link href="/login" style={{ fontSize: 13, fontWeight: 600, color: '#5A6660', textDecoration: 'none' }}>Entrar</Link>
-          <Link href="/cadastro" style={{ background: '#2C3530', color: '#FAFAF7', padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
-            Começar
-          </Link>
-          <button onClick={()=>setMenuOpen(!menuOpen)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#2C3530', display: 'flex' }}>
-            {menuOpen ? <X size={22}/> : <Menu size={22}/>}
-          </button>
-        </div>
+        {isMobile && (
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <Link href="/login" style={{ fontSize:13, fontWeight:600, color:T.mid, textDecoration:'none', padding:'7px 12px', borderRadius:T.r10, border:`1.5px solid ${T.nude}`, lineHeight:1 }}>
+              Entrar
+            </Link>
+            <Link href="/cadastro" style={{ background:T.dark, color:T.cream, padding:'7px 14px', borderRadius:T.r10, fontSize:13, fontWeight:700, textDecoration:'none', lineHeight:1 }}>
+              Começar
+            </Link>
+            <button onClick={()=>setMenuOpen(!menuOpen)}
+              style={{ background:'none', border:'none', cursor:'pointer', color:T.dark, padding:6, display:'flex', alignItems:'center', borderRadius:T.r8, marginLeft:2 }}>
+              {menuOpen ? <X size={20}/> : <Menu size={20}/>}
+            </button>
+          </div>
+        )}
       </nav>
 
-      {/* Mobile menu */}
-      {menuOpen && (
-        <div style={{ position: 'fixed', top: 64, left: 0, right: 0, zIndex: 99, background: '#FAFAF7', borderBottom: '1px solid #EDE8E0', padding: '8px 24px 16px' }}>
+      {/* Mobile dropdown menu */}
+      {menuOpen && isMobile && (
+        <div style={{ position:'fixed', top:60, left:0, right:0, zIndex:199, background:T.cream, borderBottom:`1px solid ${T.nude}`, padding:'4px 0 8px', boxShadow:T.shadowMd }}>
           {[['#como-funciona','Como funciona'],['#funcionalidades','Funcionalidades'],['#planos','Planos']].map(([h,l])=>(
             <a key={h} href={h} onClick={()=>setMenuOpen(false)}
-              style={{ display: 'block', padding: '13px 0', fontSize: 15, fontWeight: 500, color: '#2C3530', textDecoration: 'none', borderBottom: '1px solid #EDE8E0' }}>{l}</a>
+              style={{ display:'block', padding:'13px 20px', fontSize:15, fontWeight:500, color:T.dark, textDecoration:'none', borderBottom:`1px solid ${T.nude}` }}>{l}</a>
           ))}
         </div>
       )}
 
-      {/* ─── HERO ─── */}
+      {/* ══════════════════════════ HERO ══════════════════════════ */}
       <section style={{
-        minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center',
-        textAlign: 'center', padding: '130px 24px 80px',
-        background: 'radial-gradient(ellipse 90% 55% at 50% -5%, rgba(122,158,135,0.15) 0%, transparent 65%), #FAFAF7',
-        opacity: visible ? 1 : 0, transition: 'opacity 0.6s ease',
+        minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center',
+        textAlign:'center', padding: isMobile ? '100px 20px 60px' : '130px 24px 80px',
+        background:`radial-gradient(ellipse 90% 55% at 50% -5%, rgba(122,158,135,0.15) 0%, transparent 65%), ${T.cream}`,
+        opacity: mounted ? 1 : 0, transition:'opacity 0.5s ease',
       }}>
         {/* Badge */}
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#EAF3EC', border: '1px solid #D6E8DA', borderRadius: 100, padding: '6px 16px', fontSize: 12, fontWeight: 600, color: '#7A9E87', marginBottom: 32 }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#7A9E87', display: 'inline-block' }}/>
+        <div className="fade-up" style={{ display:'inline-flex', alignItems:'center', gap:8, background:T.sageG, border:`1px solid ${T.sageP}`, borderRadius:T.r100, padding:'6px 16px', fontSize:12, fontWeight:700, color:T.sage, marginBottom:28 }}>
+          <div style={{ width:6, height:6, borderRadius:'50%', background:T.sage }}/>
           Agendamento profissional simplificado
         </div>
 
         {/* H1 */}
-        <h1 style={{
-          fontFamily: "'DM Serif Display', Georgia, serif",
-          fontSize: 'clamp(38px,6vw,76px)', lineHeight: 1.06,
-          letterSpacing: '-0.025em', color: '#2C3530',
-          maxWidth: 820, marginBottom: 24,
-        }}>
+        <h1 className="fade-up-d1" style={{ fontFamily:T.fontSerif, fontSize: isMobile ? 36 : 'clamp(42px,6vw,76px)', lineHeight:1.06, letterSpacing:'-0.025em', color:T.dark, maxWidth:820, marginBottom:20 }}>
           Tenha sua página profissional e receba agendamentos{' '}
-          <em style={{ color: '#7A9E87', fontStyle: 'italic' }}>online</em> automaticamente.
+          <em style={{ color:T.sage, fontStyle:'italic' }}>online</em> automaticamente.
         </h1>
 
-        {/* Subtitle */}
-        <p style={{ fontSize: 'clamp(16px,2vw,20px)', color: '#5A6660', maxWidth: 540, lineHeight: 1.7, marginBottom: 44 }}>
-          Organize sua agenda, compartilhe seu link e permita que clientes agendem horários em segundos — sem complicação.
+        {/* Sub */}
+        <p className="fade-up-d2" style={{ fontSize: isMobile ? 16 : 19, color:T.mid, maxWidth:520, lineHeight:1.7, marginBottom:36 }}>
+          Organize sua agenda, compartilhe seu link e permita que clientes agendem em segundos.
         </p>
 
         {/* CTAs */}
-        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 48 }}>
+        <div className="fade-up-d2" style={{ display:'flex', gap:12, flexWrap:'wrap', justifyContent:'center', marginBottom:44, width:'100%', maxWidth: isMobile ? '100%' : 'auto', padding: isMobile ? '0 4px' : 0 }}>
           <Link href="/cadastro" style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            background: '#2C3530', color: '#FAFAF7', padding: '16px 38px',
-            borderRadius: 14, fontSize: 16, fontWeight: 700, textDecoration: 'none',
-            boxShadow: '0 8px 32px rgba(44,53,48,0.18)', transition: 'all 0.2s',
+            display:'inline-flex', alignItems:'center', justifyContent:'center', gap:8,
+            background:T.dark, color:T.cream,
+            padding: isMobile ? '14px 28px' : '16px 36px',
+            borderRadius:T.r14, fontSize: isMobile ? 15 : 16, fontWeight:700, textDecoration:'none',
+            boxShadow:`0 8px 28px rgba(44,53,48,0.2)`, transition:'all 0.2s',
+            flex: isMobile ? 1 : 'none', maxWidth: isMobile ? 240 : 'none',
           }}
-            onMouseEnter={e=>{e.currentTarget.style.background='#7A9E87';e.currentTarget.style.transform='translateY(-2px)'}}
-            onMouseLeave={e=>{e.currentTarget.style.background='#2C3530';e.currentTarget.style.transform='translateY(0)'}}>
+            onMouseEnter={e=>{e.currentTarget.style.background=T.sage;e.currentTarget.style.transform='translateY(-2px)'}}
+            onMouseLeave={e=>{e.currentTarget.style.background=T.dark;e.currentTarget.style.transform='translateY(0)'}}>
             ✦ Começar agora grátis
           </Link>
           <a href="#como-funciona" style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            background: 'transparent', color: '#2C3530', padding: '16px 30px',
-            borderRadius: 14, fontSize: 16, fontWeight: 600, textDecoration: 'none',
-            border: '2px solid #EDE8E0', transition: 'all 0.2s',
+            display:'inline-flex', alignItems:'center', justifyContent:'center', gap:8,
+            background:'transparent', color:T.dark,
+            padding: isMobile ? '14px 20px' : '16px 28px',
+            borderRadius:T.r14, fontSize: isMobile ? 15 : 16, fontWeight:600, textDecoration:'none',
+            border:`2px solid ${T.nude}`, transition:'all 0.2s',
           }}
-            onMouseEnter={e=>{e.currentTarget.style.borderColor='#A8C4AD';e.currentTarget.style.background='#EAF3EC';e.currentTarget.style.transform='translateY(-2px)'}}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor='#EDE8E0';e.currentTarget.style.background='transparent';e.currentTarget.style.transform='translateY(0)'}}>
-            Ver como funciona <ArrowRight size={17}/>
+            onMouseEnter={e=>{e.currentTarget.style.borderColor=T.sageL;e.currentTarget.style.background=T.sageG}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor=T.nude;e.currentTarget.style.background='transparent'}}>
+            Como funciona <ArrowRight size={16}/>
           </a>
         </div>
 
         {/* Trust */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 13, color: '#8A9690', marginBottom: 72 }}>
-          <div style={{ display: 'flex' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12, fontSize:13, color:T.muted, marginBottom: isMobile ? 40 : 64 }}>
+          <div style={{ display:'flex' }}>
             {['🧠','🌿','🦷','💆'].map((e,i)=>(
-              <div key={i} style={{ width: 34, height: 34, borderRadius: '50%', border: '2px solid #FAFAF7', background: '#D6E8DA', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, marginLeft: i===0?0:-10 }}>{e}</div>
+              <div key={i} style={{ width:32, height:32, borderRadius:'50%', border:`2px solid ${T.cream}`, background:T.sageP, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, marginLeft:i===0?0:-9 }}>{e}</div>
             ))}
           </div>
-          <span>+1.200 profissionais já usam o Organiza+</span>
+          <span style={{ fontSize: isMobile ? 12 : 13 }}>+1.200 profissionais já usam o Organiza+</span>
         </div>
 
-        {/* ─── MOCKUP ─── */}
-        <div style={{ width: '100%', maxWidth: 940, position: 'relative' }}>
-          {/* Floating card left */}
-          <div className="hidden md:flex" style={{ position: 'absolute', left: -30, bottom: 80, background: '#fff', borderRadius: 16, padding: '13px 18px', boxShadow: '0 12px 40px rgba(44,53,48,0.12)', border: '1px solid #EDE8E0', alignItems: 'center', gap: 12, zIndex: 2, animation: 'float1 3.5s ease-in-out infinite' }}>
-            <div style={{ width: 42, height: 42, borderRadius: 12, background: '#EAF3EC', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>📅</div>
-            <div>
-              <div style={{ fontSize: 10, color: '#8A9690', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Hoje</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#2C3530' }}>8 agendamentos</div>
+        {/* Dashboard mockup */}
+        {!isMobile && (
+          <div style={{ width:'100%', maxWidth:940, position:'relative' }}>
+            {/* Floating cards */}
+            <div style={{ position:'absolute', left:-20, bottom:80, background:T.white, borderRadius:T.r16, padding:'13px 18px', boxShadow:T.shadowLg, border:`1px solid ${T.nude}`, display:'flex', alignItems:'center', gap:12, zIndex:2, animation:'float1 3.5s ease-in-out infinite' }}>
+              <div style={{ width:40, height:40, borderRadius:T.r12, background:T.sageG, display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>📅</div>
+              <div><p style={{ fontSize:10, color:T.muted, fontWeight:700, textTransform:'uppercase', margin:0 }}>Hoje</p><p style={{ fontSize:14, fontWeight:700, color:T.dark, margin:0 }}>8 agendamentos</p></div>
             </div>
-          </div>
-          {/* Floating card right */}
-          <div className="hidden md:flex" style={{ position: 'absolute', right: -30, top: 80, background: '#fff', borderRadius: 16, padding: '13px 18px', boxShadow: '0 12px 40px rgba(44,53,48,0.12)', border: '1px solid #EDE8E0', alignItems: 'center', gap: 12, zIndex: 2, animation: 'float2 4s ease-in-out infinite' }}>
-            <div style={{ width: 42, height: 42, borderRadius: 12, background: '#25D366', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 20, fontWeight: 700 }}>✓</div>
-            <div>
-              <div style={{ fontSize: 10, color: '#8A9690', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>WhatsApp</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#2C3530' }}>Novo cliente!</div>
+            <div style={{ position:'absolute', right:-20, top:80, background:T.white, borderRadius:T.r16, padding:'13px 18px', boxShadow:T.shadowLg, border:`1px solid ${T.nude}`, display:'flex', alignItems:'center', gap:12, zIndex:2, animation:'float2 4s ease-in-out infinite' }}>
+              <div style={{ width:40, height:40, borderRadius:T.r12, background:'#25D36620', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>✓</div>
+              <div><p style={{ fontSize:10, color:T.muted, fontWeight:700, textTransform:'uppercase', margin:0 }}>WhatsApp</p><p style={{ fontSize:14, fontWeight:700, color:T.dark, margin:0 }}>Novo cliente!</p></div>
             </div>
-          </div>
-
-          {/* Browser shell */}
-          <div style={{ borderRadius: 22, overflow: 'hidden', boxShadow: '0 32px 80px rgba(44,53,48,0.16), 0 0 0 1px rgba(200,195,185,0.25)', background: '#fff' }}>
-            {/* Browser bar */}
-            <div style={{ background: '#F7F5F0', padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid #EDE8E0' }}>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {['#ff6b6b','#ffd166','#A8C4AD'].map(c=>(
-                  <div key={c} style={{ width: 13, height: 13, borderRadius: '50%', background: c }}/>
-                ))}
+            {/* Browser shell */}
+            <div style={{ borderRadius:20, overflow:'hidden', boxShadow:`0 28px 80px rgba(44,53,48,0.16), 0 0 0 1px rgba(200,195,185,0.25)`, background:T.white }}>
+              <div style={{ background:T.off, padding:'11px 16px', display:'flex', alignItems:'center', gap:10, borderBottom:`1px solid ${T.nude}` }}>
+                <div style={{ display:'flex', gap:5 }}>{['#ff6b6b','#ffd166',T.sageL].map(c=><div key={c} style={{ width:12, height:12, borderRadius:'50%', background:c }}/>)}</div>
+                <div style={{ flex:1, background:T.nude, borderRadius:6, padding:'5px 12px', fontSize:11, color:T.muted }}>🔒 organizamais.com/dashboard</div>
               </div>
-              <div style={{ flex: 1, background: '#EDE8E0', borderRadius: 8, padding: '5px 14px', fontSize: 12, color: '#8A9690', display: 'flex', alignItems: 'center', gap: 6 }}>
-                🔒 <span>organizamais.com/dashboard</span>
-              </div>
-            </div>
-
-            {/* Dashboard body */}
-            <div style={{ display: 'flex', minHeight: 400 }}>
-              {/* Sidebar */}
-              <div className="hidden sm:flex" style={{ width: 210, background: '#2C3530', flexDirection: 'column', padding: '20px 0', gap: 2, flexShrink: 0 }}>
-                <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 19, color: '#FAFAF7', padding: '0 20px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: 8 }}>
-                  Organiza<span style={{ color: '#A8C4AD' }}>+</span>
-                </div>
-                {[['📊','Dashboard',true],['📅','Agenda',false],['👥','Clientes',false],['🌐','Minha página',false],['⚙️','Configurações',false]].map(([ic,lb,ac])=>(
-                  <div key={lb as string} style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 10px', padding: '9px 12px', borderRadius: 10, fontSize: 13, fontWeight: 500, color: ac ? '#A8C4AD' : 'rgba(255,255,255,0.32)', background: ac ? 'rgba(122,158,135,0.18)' : 'transparent' }}>
-                    <span>{ic}</span><span>{lb}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Main */}
-              <div style={{ flex: 1, background: '#F7F5F0', padding: '24px', minWidth: 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-                  <div>
-                    <p style={{ fontWeight: 700, fontSize: 15, color: '#2C3530', margin: 0 }}>Olá, Dra. Ana 👋</p>
-                    <p style={{ fontSize: 12, color: '#8A9690', margin: '3px 0 0' }}>Sexta-feira, 13 de junho de 2025</p>
-                  </div>
-                  <span style={{ background: '#EAF3EC', color: '#7A9E87', fontSize: 11, fontWeight: 700, padding: '5px 13px', borderRadius: 100, border: '1px solid #D6E8DA' }}>✦ Premium</span>
-                </div>
-
-                {/* Cards */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 16 }}>
-                  {[['Hoje','8','↑ +3 vs ontem'],['Clientes','42','↑ +12 novos'],['Pendentes','3','⏳ Aprovar']].map(([l,v,s])=>(
-                    <div key={l} style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', border: '1px solid #EDE8E0', boxShadow: '0 2px 8px rgba(44,53,48,0.05)' }}>
-                      <p style={{ fontSize: 9, fontWeight: 700, color: '#8A9690', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>{l}</p>
-                      <p style={{ fontSize: 28, fontWeight: 800, color: '#2C3530', margin: '5px 0 3px', lineHeight: 1 }}>{v}</p>
-                      <p style={{ fontSize: 11, color: '#7A9E87', margin: 0, fontWeight: 500 }}>{s}</p>
-                    </div>
+              <div style={{ display:'flex', minHeight:360 }}>
+                <div style={{ width:200, background:T.dark, padding:'18px 0', display:'flex', flexDirection:'column', gap:2, flexShrink:0 }}>
+                  <div style={{ fontFamily:T.fontSerif, fontSize:17, color:T.cream, padding:'0 18px 16px', borderBottom:'1px solid rgba(255,255,255,0.08)', marginBottom:6 }}>Organiza<span style={{ color:T.sageL }}>+</span></div>
+                  {[['📊','Dashboard',true],['📅','Agenda',false],['👥','Clientes',false],['🌐','Minha página',false]].map(([ic,lb,ac])=>(
+                    <div key={lb as string} style={{ display:'flex', alignItems:'center', gap:9, margin:'2px 10px', padding:'8px 12px', borderRadius:10, fontSize:13, fontWeight:500, background:ac?'rgba(122,158,135,0.18)':'transparent', color:ac?T.sageL:'rgba(255,255,255,0.32)' }}>{ic} {lb}</div>
                   ))}
                 </div>
-
-                {/* Appointments */}
-                <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #EDE8E0', overflow: 'hidden' }}>
-                  <div style={{ padding: '11px 16px', borderBottom: '1px solid #EDE8E0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#2C3530' }}>Próximos agendamentos</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: '#7A9E87', background: '#EAF3EC', padding: '3px 10px', borderRadius: 100, border: '1px solid #D6E8DA' }}>Hoje</span>
+                <div style={{ flex:1, background:T.off, padding:22, minWidth:0 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:18 }}>
+                    <div><p style={{ fontWeight:700, fontSize:14, color:T.dark, margin:0 }}>Olá, Dra. Ana 👋</p><p style={{ fontSize:11, color:T.muted, margin:'2px 0 0' }}>Sexta-feira, 13 de junho de 2025</p></div>
+                    <span style={{ background:T.sageG, color:T.sage, fontSize:10, fontWeight:700, padding:'4px 10px', borderRadius:T.r100, border:`1px solid ${T.sageP}` }}>✦ Premium</span>
                   </div>
-                  {[['09:00','Mariana S.','Consulta inicial',true],['10:30','Carlos M.','Retorno',true],['14:00','Laura P.','Avaliação',false]].map(([t,n,tp,ok])=>(
-                    <div key={n as string} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', borderBottom: '1px solid rgba(237,232,224,0.6)' }}>
-                      <div style={{ background: '#EAF3EC', color: '#7A9E87', fontSize: 11, fontWeight: 700, padding: '5px 10px', borderRadius: 8, flexShrink: 0 }}>{t}</div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontSize: 13, fontWeight: 600, color: '#2C3530', margin: 0 }}>{n as string}</p>
-                        <p style={{ fontSize: 11, color: '#8A9690', margin: 0 }}>{tp as string}</p>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:14 }}>
+                    {[['Hoje','8','↑ +3'],['Clientes','42','↑ +12'],['Pendentes','3','⏳']].map(([l,v,s])=>(
+                      <div key={l} style={{ background:T.white, borderRadius:12, padding:'12px 14px', border:`1px solid ${T.nude}`, boxShadow:T.shadowSm }}>
+                        <p style={{ fontSize:9, fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.08em', margin:0 }}>{l}</p>
+                        <p style={{ fontSize:24, fontWeight:800, color:T.dark, margin:'4px 0 2px', lineHeight:1 }}>{v}</p>
+                        <p style={{ fontSize:10, color:T.sage, margin:0, fontWeight:500 }}>{s}</p>
                       </div>
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 100, background: ok ? 'rgba(122,158,135,0.12)' : 'rgba(251,191,36,0.15)', color: ok ? '#7A9E87' : '#d97706', flexShrink: 0 }}>
-                        {ok ? 'Confirmado' : 'Pendente'}
-                      </span>
+                    ))}
+                  </div>
+                  <div style={{ background:T.white, borderRadius:12, border:`1px solid ${T.nude}`, overflow:'hidden' }}>
+                    <div style={{ padding:'10px 14px', borderBottom:`1px solid ${T.nude}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                      <span style={{ fontSize:11, fontWeight:700, color:T.dark }}>Próximos agendamentos</span>
+                      <span style={{ fontSize:9, fontWeight:700, color:T.sage, background:T.sageG, padding:'2px 8px', borderRadius:T.r100 }}>Hoje</span>
                     </div>
-                  ))}
+                    {[['09:00','Mariana S.','Consulta inicial',true],['10:30','Carlos M.','Retorno',true],['14:00','Laura P.','Avaliação',false]].map(([t,n,tp,ok])=>(
+                      <div key={n as string} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderBottom:`1px solid rgba(237,232,224,0.5)` }}>
+                        <div style={{ background:T.sageG, color:T.sage, fontSize:10, fontWeight:700, padding:'4px 8px', borderRadius:7, flexShrink:0 }}>{t}</div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <p style={{ fontSize:12, fontWeight:600, color:T.dark, margin:0 }}>{n as string}</p>
+                          <p style={{ fontSize:10, color:T.muted, margin:0 }}>{tp as string}</p>
+                        </div>
+                        <span style={{ fontSize:9, fontWeight:700, padding:'2px 8px', borderRadius:T.r100, background:ok?'rgba(122,158,135,0.12)':'rgba(217,119,6,0.1)', color:ok?T.sage:'#d97706', flexShrink:0 }}>
+                          {ok?'Confirmado':'Pendente'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* Mobile: simple feature pills instead of dashboard */}
+        {isMobile && (
+          <div style={{ display:'flex', flexWrap:'wrap', gap:10, justifyContent:'center', maxWidth:360 }}>
+            {['📅 Agendamento automático','💬 Notificação WhatsApp','🌐 Página profissional','📊 Painel completo'].map(f=>(
+              <span key={f} style={{ background:T.white, border:`1px solid ${T.nude}`, borderRadius:T.r100, padding:'8px 16px', fontSize:13, color:T.mid, fontWeight:500, boxShadow:T.shadowSm }}>{f}</span>
+            ))}
+          </div>
+        )}
       </section>
 
-      {/* ─── PROFISSÕES ─── */}
-      <div style={{ padding: '48px 24px', background: '#fff', borderTop: '1px solid #EDE8E0', borderBottom: '1px solid #EDE8E0', textAlign: 'center' }}>
-        <p style={{ fontSize: 11, fontWeight: 700, color: '#8A9690', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 22 }}>
+      {/* ══════════════════════════ PROFISSÕES ══════════════════════════ */}
+      <div style={{ padding: isMobile ? '36px 20px' : '44px 24px', background:T.white, borderTop:`1px solid ${T.nude}`, borderBottom:`1px solid ${T.nude}`, textAlign:'center' }}>
+        <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.12em', marginBottom:18 }}>
           Para todos os profissionais de saúde e bem-estar
         </p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', maxWidth: 720, margin: '0 auto' }}>
-          {['🧠 Psicólogo','💊 Psiquiatra','🥗 Nutricionista','🦷 Dentista','💆 Fisioterapeuta','⚕️ Médico','🌸 Esteticista','🧘 Terapeuta','🎯 Coach','🏃 Ed. Físico','✦ E muito mais'].map(p=>(
-            <span key={p} style={{ background: '#F7F5F0', border: '1px solid #EDE8E0', borderRadius: 100, padding: '8px 18px', fontSize: 13, color: '#5A6660', fontWeight: 500, cursor: 'default', transition: 'all 0.18s' }}
-              onMouseEnter={e=>{(e.target as HTMLElement).style.background='#EAF3EC';(e.target as HTMLElement).style.borderColor='#A8C4AD';(e.target as HTMLElement).style.color='#7A9E87'}}
-              onMouseLeave={e=>{(e.target as HTMLElement).style.background='#F7F5F0';(e.target as HTMLElement).style.borderColor='#EDE8E0';(e.target as HTMLElement).style.color='#5A6660'}}>{p}</span>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:10, justifyContent:'center', maxWidth:700, margin:'0 auto' }}>
+          {['🧠 Psicólogo','💊 Psiquiatra','🥗 Nutricionista','🦷 Dentista','💆 Fisioterapeuta','⚕️ Médico','🌸 Esteticista','🧘 Terapeuta','🎯 Coach','✦ E muito mais'].map(p=>(
+            <span key={p} style={{ background:T.off, border:`1px solid ${T.nude}`, borderRadius:T.r100, padding:'7px 16px', fontSize: isMobile ? 12 : 13, color:T.mid, fontWeight:500, cursor:'default', transition:'all 0.18s' }}
+              onMouseEnter={e=>{(e.target as HTMLElement).style.background=T.sageG;(e.target as HTMLElement).style.borderColor=T.sageL;(e.target as HTMLElement).style.color=T.sage}}
+              onMouseLeave={e=>{(e.target as HTMLElement).style.background=T.off;(e.target as HTMLElement).style.borderColor=T.nude;(e.target as HTMLElement).style.color=T.mid}}>
+              {p}
+            </span>
           ))}
         </div>
       </div>
 
-      {/* ─── COMO FUNCIONA ─── */}
-      <section id="como-funciona" style={{ padding: '96px 24px', background: '#F7F5F0' }}>
-        <div style={{ maxWidth: 1080, margin: '0 auto' }}>
-          <Chip label="✦ Como funciona"/>
-          <H2>Em minutos, sua página profissional está <em style={{ color: '#7A9E87', fontStyle: 'italic' }}>no ar.</em></H2>
-          <Sub>Sem designer, sem site caro. O Organiza+ faz tudo automaticamente para você.</Sub>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 20, marginTop: 56 }}>
+      {/* ══════════════════════════ COMO FUNCIONA ══════════════════════════ */}
+      <section id="como-funciona" style={{ padding: isMobile ? '64px 20px' : '96px 24px', background:T.off }}>
+        <div style={{ maxWidth:1080, margin:'0 auto' }}>
+          <SectionChip label="✦ Como funciona"/>
+          <h2 style={{ fontFamily:T.fontSerif, fontSize: isMobile ? 28 : 'clamp(28px,4vw,44px)', color:T.dark, marginBottom:12, lineHeight:1.12 }}>
+            Em minutos, sua página profissional está <em style={{ color:T.sage, fontStyle:'italic' }}>no ar.</em>
+          </h2>
+          <p style={{ fontSize: isMobile ? 15 : 17, color:T.muted, marginBottom: isMobile ? 40 : 56, maxWidth:480, lineHeight:1.65 }}>
+            Sem designer, sem site caro. O Organiza+ faz tudo automaticamente.
+          </p>
+          <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit,minmax(220px,1fr))', gap:16 }}>
             {[
-              {n:'01', icon:'✍️', t:'Crie sua conta', d:'Cadastre-se em segundos, escolha sua profissão e preencha suas informações.'},
-              {n:'02', icon:'🌐', t:'Página criada na hora', d:'Link único gerado automaticamente no instante em que você confirmar o cadastro.'},
-              {n:'03', icon:'📅', t:'Configure horários', d:'Defina os dias e horários que você atende com controle total e visual.'},
-              {n:'04', icon:'🔔', t:'Receba agendamentos', d:'Clientes agendam online e você recebe notificação no painel e no WhatsApp.'},
+              { n:'01', icon:'✍️', t:'Crie sua conta', d:'Cadastre-se em segundos, escolha sua profissão e preencha suas informações.' },
+              { n:'02', icon:'🌐', t:'Página criada na hora', d:'Link único gerado automaticamente no instante que você confirmar o cadastro.' },
+              { n:'03', icon:'📅', t:'Configure horários', d:'Defina os dias e horários que você atende com controle total e visual.' },
+              { n:'04', icon:'🔔', t:'Receba agendamentos', d:'Clientes agendam online e você recebe notificação no painel e no WhatsApp.' },
             ].map(s=>(
-              <Card key={s.n} style={{ position: 'relative', overflow: 'hidden' }}>
-                <span style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 52, color: 'rgba(122,158,135,0.11)', position: 'absolute', top: 10, right: 16, lineHeight: 1, userSelect: 'none' }}>{s.n}</span>
-                <div style={{ width: 50, height: 50, background: '#EAF3EC', border: '1px solid #D6E8DA', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, marginBottom: 20 }}>{s.icon}</div>
-                <h3 style={{ fontSize: 16, fontWeight: 700, color: '#2C3530', marginBottom: 10 }}>{s.t}</h3>
-                <p style={{ fontSize: 14, color: '#5A6660', lineHeight: 1.65, margin: 0 }}>{s.d}</p>
-              </Card>
+              <StepCard key={s.n} {...s}/>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ─── PÁGINA PÚBLICA ─── */}
-      <section style={{ padding: '96px 24px', background: 'linear-gradient(140deg, #EAF3EC 0%, #F4EFE8 100%)' }}>
-        <div style={{ maxWidth: 1080, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'center' }} className="grid-stack">
+      {/* ══════════════════════════ PÁGINA PÚBLICA ══════════════════════════ */}
+      <section style={{ padding: isMobile ? '64px 20px' : '96px 24px', background:`linear-gradient(140deg, ${T.sageG} 0%, ${T.begeP} 100%)` }}>
+        <div style={{ maxWidth:1080, margin:'0 auto', display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? 32 : 64, alignItems:'center' }}>
           <div>
-            <Chip label="🌐 Sua página profissional"/>
-            <H2>Uma página elegante que representa você com <em style={{ color: '#7A9E87', fontStyle: 'italic' }}>sofisticação.</em></H2>
-            <Sub style={{ marginBottom: 36 }}>Cada profissional recebe uma página personalizada, responsiva e pronta para receber clientes.</Sub>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <SectionChip label="🌐 Sua página profissional"/>
+            <h2 style={{ fontFamily:T.fontSerif, fontSize: isMobile ? 28 : 'clamp(28px,4vw,40px)', color:T.dark, marginBottom:16, lineHeight:1.12 }}>
+              Uma página elegante que representa você com <em style={{ color:T.sage, fontStyle:'italic' }}>sofisticação.</em>
+            </h2>
+            <p style={{ fontSize: isMobile ? 14 : 16, color:T.mid, marginBottom:24, lineHeight:1.7 }}>
+              Cada profissional recebe uma página personalizada, responsiva e pronta para receber clientes.
+            </p>
+            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
               {[
-                {icon:'🔗', t:'Link personalizado', d:'organizamais.com/seu-nome — compartilhe nas redes e no WhatsApp.'},
-                {icon:'📱', t:'100% responsiva', d:'Funciona perfeitamente em celular, tablet ou computador.'},
-                {icon:'⚡', t:'Agendamento em 30 segundos', d:'O cliente agenda sem precisar ligar ou mandar mensagem.'},
-                {icon:'💬', t:'Notificação WhatsApp', d:'Você recebe os dados completos do cliente instantaneamente.'},
+                { icon:'🔗', t:'Link personalizado', d:'organizamais.com/seu-nome — compartilhe nas redes.' },
+                { icon:'📱', t:'100% responsiva', d:'Funciona perfeitamente em qualquer dispositivo.' },
+                { icon:'⚡', t:'Agendamento em 30 segundos', d:'O cliente agenda sem precisar ligar.' },
+                { icon:'💬', t:'Notificação WhatsApp', d:'Você recebe os dados completos instantaneamente.' },
               ].map(f=>(
-                <div key={f.t} style={{ display: 'flex', gap: 14, background: '#fff', borderRadius: 16, padding: '16px 18px', boxShadow: '0 2px 10px rgba(44,53,48,0.05)', transition: 'transform 0.2s' }}
+                <div key={f.t} style={{ display:'flex', gap:12, background:T.white, borderRadius:T.r16, padding:'14px 16px', boxShadow:T.shadowSm, transition:'transform 0.18s' }}
                   onMouseEnter={e=>e.currentTarget.style.transform='translateX(4px)'}
                   onMouseLeave={e=>e.currentTarget.style.transform='translateX(0)'}>
-                  <div style={{ width: 44, height: 44, background: '#EAF3EC', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>{f.icon}</div>
+                  <div style={{ width:40, height:40, background:T.sageG, borderRadius:T.r12, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>{f.icon}</div>
                   <div>
-                    <p style={{ fontWeight: 700, fontSize: 14, color: '#2C3530', margin: '0 0 3px' }}>{f.t}</p>
-                    <p style={{ fontSize: 13, color: '#5A6660', margin: 0 }}>{f.d}</p>
+                    <p style={{ fontWeight:700, fontSize:13, color:T.dark, margin:'0 0 2px' }}>{f.t}</p>
+                    <p style={{ fontSize:12, color:T.mid, margin:0 }}>{f.d}</p>
                   </div>
                 </div>
               ))}
             </div>
           </div>
-          {/* Profile card */}
-          <div style={{ background: '#fff', borderRadius: 28, boxShadow: '0 24px 64px rgba(44,53,48,0.13)', overflow: 'hidden' }}>
-            <div style={{ padding: '32px 28px 24px', background: 'linear-gradient(135deg, #2C3530 0%, #3d4f47 100%)' }}>
-              <div style={{ width: 76, height: 76, borderRadius: '50%', background: '#D6E8DA', border: '3px solid rgba(255,255,255,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, marginBottom: 16 }}>👩‍⚕️</div>
-              <h3 style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 24, color: '#FAFAF7', margin: '0 0 5px' }}>Dra. Ana Beatriz</h3>
-              <p style={{ fontSize: 14, color: '#A8C4AD', margin: '0 0 4px', fontWeight: 500 }}>Psicóloga Clínica — CRP 06/12345</p>
-              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)', margin: 0 }}>📍 São Paulo, SP · Online e presencial</p>
-            </div>
-            <div style={{ padding: '22px 26px' }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
-                {['Ansiedade','Depressão','TCC','Relacionamentos'].map(t=>(
-                  <span key={t} style={{ background: '#EAF3EC', border: '1px solid #D6E8DA', color: '#7A9E87', fontSize: 12, fontWeight: 600, padding: '5px 13px', borderRadius: 100 }}>{t}</span>
-                ))}
-              </div>
-              <p style={{ fontSize: 14, color: '#5A6660', lineHeight: 1.65, marginBottom: 18 }}>Especializada em TCC com 8 anos de experiência. Atendo adultos e adolescentes com foco em ansiedade e autoconhecimento.</p>
-              <p style={{ fontSize: 11, fontWeight: 700, color: '#8A9690', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>Horários disponíveis — Terça</p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
-                {[['09:00',true],['10:00',false],['14:00',false],['15:00',false]].map(([t,sel])=>(
-                  <span key={t as string} style={{ border: `2px solid ${sel?'#7A9E87':'#EDE8E0'}`, background: sel?'#7A9E87':'#F7F5F0', color: sel?'#fff':'#2C3530', borderRadius: 10, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{t as string}</span>
-                ))}
-              </div>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button style={{ flex: 1, background: '#2C3530', color: '#FAFAF7', border: 'none', borderRadius: 12, padding: '14px', fontSize: 14, fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s' }}
-                  onMouseEnter={e=>e.currentTarget.style.background='#7A9E87'}
-                  onMouseLeave={e=>e.currentTarget.style.background='#2C3530'}>
-                  Agendar consulta →
-                </button>
-                <button style={{ background: '#25D366', color: 'white', border: 'none', borderRadius: 12, padding: '14px 18px', fontSize: 20, cursor: 'pointer' }}>✉</button>
-              </div>
-            </div>
-          </div>
+
+          {/* Profile card mockup */}
+          <ProfileCardMockup/>
         </div>
       </section>
 
-      {/* ─── FUNCIONALIDADES ─── */}
-      <section id="funcionalidades" style={{ padding: '96px 24px', background: '#2C3530' }}>
-        <div style={{ maxWidth: 1080, margin: '0 auto' }}>
-          <Chip label="✦ Funcionalidades" dark/>
-          <H2 style={{ color: '#FAFAF7', maxWidth: 620 }}>Tudo que você precisa para <em style={{ color: '#A8C4AD', fontStyle: 'italic' }}>organizar e crescer</em> sua agenda.</H2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 16, marginTop: 56 }}>
+      {/* ══════════════════════════ FUNCIONALIDADES ══════════════════════════ */}
+      <section id="funcionalidades" style={{ padding: isMobile ? '64px 20px' : '96px 24px', background:T.dark }}>
+        <div style={{ maxWidth:1080, margin:'0 auto' }}>
+          <SectionChip label="✦ Funcionalidades" dark/>
+          <h2 style={{ fontFamily:T.fontSerif, fontSize: isMobile ? 28 : 'clamp(28px,4vw,44px)', color:T.cream, marginBottom: isMobile ? 40 : 56, lineHeight:1.12, maxWidth:580 }}>
+            Tudo que você precisa para <em style={{ color:T.sageL, fontStyle:'italic' }}>organizar e crescer.</em>
+          </h2>
+          <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3,1fr)', gap: isMobile ? 12 : 16 }}>
             {[
-              {icon:'📊', t:'Dashboard completo', d:'Visualize agendamentos, clientes e métricas em tempo real.'},
-              {icon:'🗓️', t:'Gestão de horários', d:'Defina disponibilidade, bloqueie datas com total controle.'},
-              {icon:'🌐', t:'Página automática', d:'Gerada ao criar a conta — elegante e pronta para compartilhar.'},
-              {icon:'💬', t:'WhatsApp automático', d:'Notificação instantânea com todos os dados do cliente.'},
-              {icon:'🎨', t:'8 temas de cores', d:'Personalize as cores da sua página com um clique.'},
-              {icon:'🔒', t:'Multi-usuário seguro', d:'Cada conta é isolada e protegida com segurança total.'},
+              { icon:'📊', t:'Dashboard completo',      d:'Agendamentos, clientes e métricas em tempo real.' },
+              { icon:'🗓️', t:'Gestão de horários',      d:'Defina disponibilidade e bloqueie datas facilmente.' },
+              { icon:'🌐', t:'Página automática',        d:'Gerada ao criar a conta, pronta para compartilhar.' },
+              { icon:'💬', t:'WhatsApp automático',      d:'Notificação instantânea com dados do cliente.' },
+              { icon:'🎨', t:'8 temas de cores',         d:'Personalize as cores da sua página com um clique.' },
+              { icon:'🔒', t:'Multi-usuário seguro',     d:'Cada conta é isolada e protegida.' },
             ].map(f=>(
-              <div key={f.t} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, padding: '28px', transition: 'all 0.2s', cursor: 'default' }}
-                onMouseEnter={e=>{e.currentTarget.style.background='rgba(122,158,135,0.1)';e.currentTarget.style.borderColor='rgba(122,158,135,0.25)';e.currentTarget.style.transform='translateY(-3px)'}}
-                onMouseLeave={e=>{e.currentTarget.style.background='rgba(255,255,255,0.04)';e.currentTarget.style.borderColor='rgba(255,255,255,0.07)';e.currentTarget.style.transform='translateY(0)'}}>
-                <div style={{ fontSize: 26, marginBottom: 16 }}>{f.icon}</div>
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#FAFAF7', marginBottom: 8 }}>{f.t}</h3>
-                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', lineHeight: 1.7, margin: 0 }}>{f.d}</p>
-              </div>
+              <FeatCard key={f.t} {...f} mobile={isMobile}/>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ─── PLANOS ─── */}
-      <section id="planos" style={{ padding: '96px 24px', background: '#F4EFE8' }}>
-        <div style={{ maxWidth: 1080, margin: '0 auto', textAlign: 'center' }}>
-          <Chip label="💰 Planos"/>
-          <H2>Simples, transparente e <em style={{ color: '#7A9E87', fontStyle: 'italic' }}>acessível.</em></H2>
-          <Sub style={{ marginBottom: 56 }}>Sem surpresas. Cancele quando quiser. Comece em minutos.</Sub>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 24, maxWidth: 720, margin: '0 auto' }}>
-            {[
-              { name:'🌿 Basic', price:'27', features:['Página profissional','Link personalizado','Agendamento online','Integração WhatsApp','Responsivo mobile'], href:'/cadastro?plano=basic', featured: false },
-              { name:'💎 Premium', price:'47', features:['Tudo do Basic','Painel administrativo','Gestão de horários','8 temas de cores','Upload de fotos','Analytics completo','SEO básico incluso'], href:'/cadastro?plano=premium', featured: true },
-            ].map(p=>(
-              <div key={p.name} style={{ background: p.featured?'#2C3530':'#fff', borderRadius: 28, padding: '36px 32px', border: p.featured?'none':'2px solid #EDE8E0', boxShadow: p.featured?'0 24px 60px rgba(44,53,48,0.16)':'0 4px 20px rgba(44,53,48,0.06)', position: 'relative', outline: p.featured?'2px solid #7A9E87':'none', transition: 'transform 0.2s' }}
-                onMouseEnter={e=>e.currentTarget.style.transform='translateY(-5px)'}
-                onMouseLeave={e=>e.currentTarget.style.transform='translateY(0)'}>
-                {p.featured && <div style={{ position: 'absolute', top: 18, right: 18, background: '#7A9E87', color: '#FAFAF7', fontSize: 10, fontWeight: 700, padding: '4px 13px', borderRadius: 100 }}>Mais popular</div>}
-                <p style={{ fontSize: 12, fontWeight: 700, color: p.featured?'#A8C4AD':'#8A9690', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>{p.name}</p>
-                <div style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 54, color: p.featured?'#FAFAF7':'#2C3530', lineHeight: 1, marginBottom: 4 }}>R${p.price}</div>
-                <p style={{ fontSize: 14, color: p.featured?'rgba(255,255,255,0.38)':'#8A9690', marginBottom: 28 }}>por mês</p>
-                <hr style={{ border: 'none', borderTop: `1px solid ${p.featured?'rgba(255,255,255,0.08)':'#EDE8E0'}`, marginBottom: 28 }}/>
-                <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 30px', display: 'flex', flexDirection: 'column', gap: 13, textAlign: 'left' }}>
-                  {p.features.map(f=>(
-                    <li key={f} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: p.featured?'rgba(255,255,255,0.72)':'#5A6660', fontWeight: 500 }}>
-                      <span style={{ width: 18, height: 18, borderRadius: '50%', background: p.featured?'rgba(168,196,173,0.2)':'#EAF3EC', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 10, color: p.featured?'#A8C4AD':'#7A9E87', fontWeight: 700 }}>✓</span>{f}
-                    </li>
-                  ))}
-                </ul>
-                <Link href={p.href} style={{ display: 'block', textAlign: 'center', padding: '15px', borderRadius: 13, fontSize: 15, fontWeight: 700, textDecoration: 'none', background: p.featured?'#7A9E87':'transparent', color: p.featured?'#FAFAF7':'#2C3530', border: p.featured?'none':'2px solid #EDE8E0', transition: 'all 0.2s' }}
-                  onMouseEnter={e=>{if(p.featured){e.currentTarget.style.background='#A8C4AD'}else{e.currentTarget.style.background='#EAF3EC';e.currentTarget.style.borderColor='#7A9E87'}}}
-                  onMouseLeave={e=>{if(p.featured){e.currentTarget.style.background='#7A9E87'}else{e.currentTarget.style.background='transparent';e.currentTarget.style.borderColor='#EDE8E0'}}}>
-                  {p.featured ? 'Começar Premium →' : 'Começar Basic'}
-                </Link>
-              </div>
-            ))}
+      {/* ══════════════════════════ PLANOS ══════════════════════════ */}
+      <section id="planos" style={{ padding: isMobile ? '64px 20px' : '96px 24px', background:T.begeP }}>
+        <div style={{ maxWidth:900, margin:'0 auto', textAlign:'center' }}>
+          <SectionChip label="💰 Planos"/>
+          <h2 style={{ fontFamily:T.fontSerif, fontSize: isMobile ? 28 : 'clamp(28px,4vw,44px)', color:T.dark, marginBottom:10, lineHeight:1.12 }}>
+            Simples, transparente e <em style={{ color:T.sage, fontStyle:'italic' }}>acessível.</em>
+          </h2>
+          <p style={{ fontSize: isMobile ? 14 : 16, color:T.muted, marginBottom: isMobile ? 36 : 52 }}>
+            Sem surpresas. Cancele quando quiser.
+          </p>
+          <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2,1fr)', gap:20, maxWidth:720, margin:'0 auto' }}>
+            <PlanCard
+              name="🌿 Basic" price="27"
+              features={['Página profissional','Link personalizado','Agendamento online','Integração WhatsApp','Responsivo mobile']}
+              cta="Começar Basic" href="/cadastro?plano=basic" featured={false}/>
+            <PlanCard
+              name="💎 Premium" price="47"
+              features={['Tudo do Basic','Painel administrativo','Gestão de horários','8 temas de cores','Upload de fotos','Analytics completo','SEO básico incluso']}
+              cta="Começar Premium →" href="/cadastro?plano=premium" featured={true} badge="Mais popular"/>
           </div>
         </div>
       </section>
 
-      {/* ─── DEPOIMENTOS ─── */}
-      <section style={{ padding: '96px 24px', background: '#FAFAF7' }}>
-        <div style={{ maxWidth: 1080, margin: '0 auto' }}>
-          <Chip label="💬 Depoimentos"/>
-          <H2 style={{ marginBottom: 52 }}>Quem usa, <em style={{ color: '#7A9E87', fontStyle: 'italic' }}>ama.</em></H2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 22 }}>
+      {/* ══════════════════════════ DEPOIMENTOS ══════════════════════════ */}
+      <section style={{ padding: isMobile ? '64px 20px' : '96px 24px', background:T.cream }}>
+        <div style={{ maxWidth:1080, margin:'0 auto' }}>
+          <SectionChip label="💬 Depoimentos"/>
+          <h2 style={{ fontFamily:T.fontSerif, fontSize: isMobile ? 28 : 'clamp(28px,4vw,44px)', color:T.dark, marginBottom: isMobile ? 32 : 52, lineHeight:1.12 }}>
+            Quem usa, <em style={{ color:T.sage, fontStyle:'italic' }}>ama.</em>
+          </h2>
+          <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap:18 }}>
             {[
-              {emoji:'🧠', name:'Dra. Camila R.', role:'Psicóloga · São Paulo', text:'Reduzi em 90% o tempo respondendo mensagens sobre agendamento. Meus clientes adoram a praticidade da minha página.'},
-              {emoji:'🥗', name:'Fernanda M.', role:'Nutricionista · Curitiba', text:'Finalmente tenho uma página profissional linda sem pagar caro por um site. O visual impressiona muito!'},
-              {emoji:'💆', name:'Rafael S.', role:'Fisioterapeuta · BH', text:'Recebi o aviso no WhatsApp na hora. Nunca mais perdi uma consulta por falta de comunicação com o cliente.'},
+              { e:'🧠', n:'Dra. Camila R.', r:'Psicóloga · São Paulo',    t:'Reduzi em 90% o tempo respondendo mensagens. Meus clientes adoram a praticidade!' },
+              { e:'🥗', n:'Fernanda M.',    r:'Nutricionista · Curitiba',  t:'Finalmente tenho uma página profissional linda sem pagar caro por um site.' },
+              { e:'💆', n:'Rafael S.',      r:'Fisioterapeuta · BH',       t:'Recebi o aviso no WhatsApp na hora. Nunca mais perdi uma consulta.' },
             ].map(t=>(
-              <Card key={t.name}>
-                <div style={{ color: '#f5c842', fontSize: 16, marginBottom: 14, letterSpacing: 2 }}>★★★★★</div>
-                <p style={{ fontSize: 15, color: '#5A6660', lineHeight: 1.7, fontStyle: 'italic', marginBottom: 22 }}>"{t.text}"</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 42, height: 42, borderRadius: '50%', background: '#EAF3EC', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>{t.emoji}</div>
-                  <div>
-                    <p style={{ fontWeight: 700, fontSize: 14, color: '#2C3530', margin: 0 }}>{t.name}</p>
-                    <p style={{ fontSize: 12, color: '#8A9690', margin: 0 }}>{t.role}</p>
-                  </div>
-                </div>
-              </Card>
+              <TestCard key={t.n} {...t}/>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ─── CTA FINAL ─── */}
-      <section style={{ padding: '110px 24px', background: '#2C3530', textAlign: 'center', backgroundImage: 'radial-gradient(ellipse 70% 65% at 50% 50%, rgba(122,158,135,0.13) 0%, transparent 70%)' }}>
-        <h2 style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 'clamp(34px,5vw,60px)', color: '#FAFAF7', lineHeight: 1.12, maxWidth: 640, margin: '0 auto 18px' }}>
-          Pronto para transformar sua <em style={{ color: '#A8C4AD', fontStyle: 'italic' }}>agenda profissional?</em>
+      {/* ══════════════════════════ CTA FINAL ══════════════════════════ */}
+      <section style={{ padding: isMobile ? '72px 20px' : '110px 24px', background:T.dark, textAlign:'center', backgroundImage:`radial-gradient(ellipse 70% 60% at 50% 50%, rgba(122,158,135,0.13) 0%, transparent 70%)` }}>
+        <h2 style={{ fontFamily:T.fontSerif, fontSize: isMobile ? 30 : 'clamp(32px,5vw,56px)', color:T.cream, lineHeight:1.12, maxWidth:600, margin:'0 auto 14px' }}>
+          Pronto para transformar sua <em style={{ color:T.sageL, fontStyle:'italic' }}>agenda profissional?</em>
         </h2>
-        <p style={{ fontSize: 18, color: 'rgba(255,255,255,0.48)', maxWidth: 440, margin: '0 auto 44px' }}>
-          Crie sua conta agora. Sua página profissional no ar em menos de 5 minutos.
+        <p style={{ fontSize: isMobile ? 15 : 17, color:'rgba(255,255,255,0.48)', maxWidth:420, margin:'0 auto 36px' }}>
+          Sua página profissional no ar em menos de 5 minutos.
         </p>
-        <Link href="/cadastro" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: '#7A9E87', color: '#FAFAF7', padding: '18px 48px', borderRadius: 14, fontSize: 17, fontWeight: 700, textDecoration: 'none', boxShadow: '0 14px 40px rgba(122,158,135,0.35)', transition: 'all 0.2s' }}
-          onMouseEnter={e=>{e.currentTarget.style.background='#A8C4AD';e.currentTarget.style.transform='translateY(-2px)'}}
-          onMouseLeave={e=>{e.currentTarget.style.background='#7A9E87';e.currentTarget.style.transform='translateY(0)'}}>
-          ✦ Começar agora — é grátis <ArrowRight size={19}/>
+        <Link href="/cadastro" style={{ display:'inline-flex', alignItems:'center', gap:10, background:T.sage, color:T.cream, padding: isMobile ? '14px 28px' : '17px 44px', borderRadius:T.r14, fontSize: isMobile ? 15 : 17, fontWeight:700, textDecoration:'none', boxShadow:`0 12px 36px rgba(122,158,135,0.35)`, transition:'all 0.2s' }}
+          onMouseEnter={e=>{e.currentTarget.style.background=T.sageL;e.currentTarget.style.transform='translateY(-2px)'}}
+          onMouseLeave={e=>{e.currentTarget.style.background=T.sage;e.currentTarget.style.transform='translateY(0)'}}>
+          ✦ Começar agora — é grátis <ArrowRight size={18}/>
         </Link>
       </section>
 
-      {/* ─── FOOTER ─── */}
-      <footer style={{ background: '#2C3530', borderTop: '1px solid rgba(255,255,255,0.06)', padding: '40px 24px', textAlign: 'center' }}>
-        <p style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 18, color: 'rgba(255,255,255,0.18)', marginBottom: 8 }}>
-          Organiza<span style={{ color: 'rgba(122,158,135,0.45)' }}>+</span>
-        </p>
-        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.18)', margin: 0 }}>© 2025 Organiza+. Feito com 💚 para profissionais modernos.</p>
+      {/* ══════════════════════════ FOOTER ══════════════════════════ */}
+      <footer style={{ background:T.dark, borderTop:'1px solid rgba(255,255,255,0.06)', padding: isMobile ? '28px 20px' : '36px 24px', textAlign:'center' }}>
+        <p style={{ fontFamily:T.fontSerif, fontSize:17, color:'rgba(255,255,255,0.18)', marginBottom:6 }}>Organiza<span style={{ color:'rgba(122,158,135,0.45)' }}>+</span></p>
+        <p style={{ fontSize:12, color:'rgba(255,255,255,0.18)', margin:0 }}>© 2025 Organiza+. Feito com 💚 para profissionais modernos.</p>
       </footer>
-
-      {/* Global styles */}
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap');
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html { scroll-behavior: smooth; }
-        body { overflow-x: hidden; }
-        @keyframes float1 { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-9px)} }
-        @keyframes float2 { 0%,100%{transform:translateY(0)} 50%{transform:translateY(9px)} }
-        .grid-stack { grid-template-columns: 1fr 1fr !important; }
-        @media(max-width:768px) {
-          .grid-stack { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
     </div>
   )
 }
 
-// ── Small reusable components ──
-function Chip({ label, dark }: { label: string; dark?: boolean }) {
+// ── Sub-components ──────────────────────────────────────────────────────────
+function SectionChip({ label, dark }: { label:string, dark?:boolean }) {
   return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: dark ? 'rgba(122,158,135,0.15)' : '#EAF3EC', border: `1px solid ${dark ? 'rgba(122,158,135,0.25)' : '#D6E8DA'}`, borderRadius: 100, padding: '5px 15px', fontSize: 12, fontWeight: 600, color: dark ? '#A8C4AD' : '#7A9E87', marginBottom: 18 }}>{label}</div>
+    <div style={{ display:'inline-flex', alignItems:'center', gap:8, background:dark?'rgba(122,158,135,0.15)':T.sageG, border:`1px solid ${dark?'rgba(122,158,135,0.25)':T.sageP}`, borderRadius:T.r100, padding:'5px 14px', fontSize:12, fontWeight:700, color:dark?T.sageL:T.sage, marginBottom:18 }}>
+      {label}
+    </div>
   )
 }
-function H2({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return <h2 style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: 'clamp(28px,4vw,46px)', color: '#2C3530', lineHeight: 1.12, marginBottom: 14, ...style }}>{children}</h2>
-}
-function Sub({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return <p style={{ fontSize: 18, color: '#5A6660', lineHeight: 1.65, maxWidth: 500, marginBottom: 0, ...style }}>{children}</p>
-}
-function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+
+function StepCard({ n, icon, t, d }: { n:string, icon:string, t:string, d:string }) {
+  const [h,setH] = useState(false)
   return (
-    <div style={{ background: '#fff', borderRadius: 20, border: '1px solid #EDE8E0', boxShadow: '0 2px 12px rgba(44,53,48,0.06)', padding: '28px', transition: 'transform 0.2s, box-shadow 0.2s', ...style }}
-      onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-4px)';e.currentTarget.style.boxShadow='0 12px 40px rgba(44,53,48,0.10)'}}
-      onMouseLeave={e=>{e.currentTarget.style.transform='translateY(0)';e.currentTarget.style.boxShadow='0 2px 12px rgba(44,53,48,0.06)'}}>
-      {children}
+    <div onMouseEnter={()=>setH(true)} onMouseLeave={()=>setH(false)}
+      style={{ background:T.white, borderRadius:T.r20, padding:'26px 22px', border:`1px solid ${T.nude}`, boxShadow:h?T.shadowMd:T.shadowCard, position:'relative', overflow:'hidden', transition:'all 0.2s', transform:h?'translateY(-3px)':'none' }}>
+      <span style={{ fontFamily:T.fontSerif, fontSize:48, color:`rgba(122,158,135,0.1)`, position:'absolute', top:10, right:14, lineHeight:1, userSelect:'none' }}>{n}</span>
+      <div style={{ width:48, height:48, background:T.sageG, border:`1px solid ${T.sageP}`, borderRadius:T.r14, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, marginBottom:18 }}>{icon}</div>
+      <h3 style={{ fontSize:15, fontWeight:700, color:T.dark, marginBottom:8 }}>{t}</h3>
+      <p style={{ fontSize:13, color:T.mid, lineHeight:1.65, margin:0 }}>{d}</p>
+    </div>
+  )
+}
+
+function FeatCard({ icon, t, d, mobile }: { icon:string, t:string, d:string, mobile:boolean }) {
+  const [h,setH] = useState(false)
+  return (
+    <div onMouseEnter={()=>setH(true)} onMouseLeave={()=>setH(false)}
+      style={{ background:h?'rgba(122,158,135,0.1)':'rgba(255,255,255,0.04)', border:`1px solid ${h?'rgba(122,158,135,0.22)':'rgba(255,255,255,0.07)'}`, borderRadius:T.r20, padding: mobile ? '18px 14px' : '26px', transition:'all 0.2s', transform:h?'translateY(-3px)':'none' }}>
+      <div style={{ fontSize: mobile ? 24 : 26, marginBottom: mobile ? 10 : 14 }}>{icon}</div>
+      <h3 style={{ fontSize: mobile ? 13 : 15, fontWeight:700, color:T.cream, marginBottom: mobile ? 5 : 8 }}>{t}</h3>
+      <p style={{ fontSize: mobile ? 11 : 13, color:'rgba(255,255,255,0.42)', lineHeight:1.65, margin:0 }}>{d}</p>
+    </div>
+  )
+}
+
+function ProfileCardMockup() {
+  return (
+    <div style={{ background:T.white, borderRadius:T.r24, boxShadow:T.shadowXl, overflow:'hidden' }}>
+      <div style={{ padding:'28px 24px 22px', background:`linear-gradient(135deg, ${T.dark} 0%, #3d4f47 100%)` }}>
+        <div style={{ width:68, height:68, borderRadius:'50%', background:T.sageP, border:'3px solid rgba(255,255,255,0.18)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:28, marginBottom:14 }}>👩‍⚕️</div>
+        <h3 style={{ fontFamily:T.fontSerif, fontSize:20, color:T.cream, margin:'0 0 4px' }}>Dra. Ana Beatriz</h3>
+        <p style={{ fontSize:13, color:T.sageL, margin:'0 0 3px', fontWeight:500 }}>Psicóloga Clínica — CRP 06/12345</p>
+        <p style={{ fontSize:12, color:'rgba(255,255,255,0.38)', margin:0 }}>📍 São Paulo, SP · Online e presencial</p>
+      </div>
+      <div style={{ padding:'20px 22px' }}>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:7, marginBottom:16 }}>
+          {['Ansiedade','Depressão','TCC','Relacionamentos'].map(t=>(
+            <span key={t} style={{ background:T.sageG, border:`1px solid ${T.sageP}`, color:T.sage, fontSize:11, fontWeight:600, padding:'4px 11px', borderRadius:T.r100 }}>{t}</span>
+          ))}
+        </div>
+        <p style={{ fontSize:13, color:T.mid, lineHeight:1.65, marginBottom:16 }}>Especializada em TCC com 8 anos de experiência. Atendo adultos e adolescentes.</p>
+        {/* Time slots */}
+        <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:10 }}>Horários — Terça-feira</p>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:18 }}>
+          {[['09:00',true],['10:00',false],['14:00',false],['15:00',false]].map(([t,sel])=>(
+            <span key={t as string} style={{ border:`2px solid ${sel?T.sage:T.nude}`, background:sel?T.sage:T.off, color:sel?'#fff':T.dark, borderRadius:T.r10, padding:'7px 13px', fontSize:13, fontWeight:600, cursor:'pointer', transition:'all 0.15s' }}>{t as string}</span>
+          ))}
+        </div>
+        <div style={{ display:'flex', gap:10 }}>
+          <button style={{ flex:1, background:T.dark, color:T.cream, border:'none', borderRadius:T.r12, padding:'13px', fontSize:14, fontWeight:700, cursor:'pointer', transition:'background 0.2s' }}
+            onMouseEnter={e=>e.currentTarget.style.background=T.sage} onMouseLeave={e=>e.currentTarget.style.background=T.dark}>
+            Agendar consulta →
+          </button>
+          <button style={{ background:'#25D366', color:'white', border:'none', borderRadius:T.r12, padding:'13px 16px', fontSize:18, cursor:'pointer' }}>✉</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PlanCard({ name, price, features, cta, href, featured, badge }: { name:string, price:string, features:string[], cta:string, href:string, featured:boolean, badge?:string }) {
+  const [h,setH] = useState(false)
+  return (
+    <div onMouseEnter={()=>setH(true)} onMouseLeave={()=>setH(false)}
+      style={{ background:featured?T.dark:T.white, borderRadius:T.r24, padding:'32px 28px', border:featured?'none':`2px solid ${T.nude}`, outline:featured?`2px solid ${T.sage}`:'none', boxShadow:h?T.shadowXl:featured?T.shadowLg:T.shadowCard, position:'relative', overflow:'hidden', transition:'transform 0.2s, box-shadow 0.2s', transform:h?'translateY(-4px)':'none', textAlign:'left' }}>
+      {badge && <div style={{ position:'absolute', top:16, right:16, background:T.sage, color:T.cream, fontSize:10, fontWeight:700, padding:'4px 12px', borderRadius:T.r100 }}>{badge}</div>}
+      <p style={{ fontSize:12, fontWeight:700, color:featured?T.sageL:T.muted, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10 }}>{name}</p>
+      <div style={{ display:'flex', alignItems:'flex-end', gap:5, marginBottom:6 }}>
+        <span style={{ fontFamily:T.fontSerif, fontSize:50, color:featured?T.cream:T.dark, lineHeight:1 }}>R${price}</span>
+        <span style={{ fontSize:13, color:featured?'rgba(255,255,255,0.4)':T.muted, marginBottom:8 }}>/mês</span>
+      </div>
+      <hr style={{ border:'none', borderTop:`1px solid ${featured?'rgba(255,255,255,0.09)':T.nude}`, margin:'20px 0' }}/>
+      <ul style={{ listStyle:'none', padding:0, margin:'0 0 26px', display:'flex', flexDirection:'column', gap:11 }}>
+        {features.map(f=>(
+          <li key={f} style={{ display:'flex', alignItems:'center', gap:10, fontSize:14, color:featured?'rgba(255,255,255,0.75)':T.mid, fontWeight:500 }}>
+            <span style={{ width:18, height:18, borderRadius:'50%', background:featured?'rgba(168,196,173,0.18)':T.sageG, border:`1px solid ${featured?'rgba(168,196,173,0.3)':T.sageP}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:9, color:featured?T.sageL:T.sage, fontWeight:700 }}>✓</span>
+            {f}
+          </li>
+        ))}
+      </ul>
+      <Link href={href} style={{ display:'block', textAlign:'center', padding:'13px', borderRadius:T.r12, fontSize:14, fontWeight:700, textDecoration:'none', background:featured?T.sage:'transparent', color:featured?T.cream:T.dark, border:featured?'none':`2px solid ${T.nude}`, transition:'all 0.2s' }}
+        onMouseEnter={e=>{if(featured){e.currentTarget.style.background=T.sageL}else{e.currentTarget.style.background=T.sageG;e.currentTarget.style.borderColor=T.sage}}}
+        onMouseLeave={e=>{if(featured){e.currentTarget.style.background=T.sage}else{e.currentTarget.style.background='transparent';e.currentTarget.style.borderColor=T.nude}}}>
+        {cta}
+      </Link>
+    </div>
+  )
+}
+
+function TestCard({ e, n, r, t }: { e:string, n:string, r:string, t:string }) {
+  const [h,setH] = useState(false)
+  return (
+    <div onMouseEnter={()=>setH(true)} onMouseLeave={()=>setH(false)}
+      style={{ background:T.white, borderRadius:T.r20, padding:'26px', border:`1px solid ${T.nude}`, boxShadow:h?T.shadowMd:T.shadowCard, transition:'transform 0.2s, box-shadow 0.2s', transform:h?'translateY(-3px)':'none' }}>
+      <div style={{ color:'#f5c842', fontSize:15, marginBottom:12, letterSpacing:2 }}>★★★★★</div>
+      <p style={{ fontSize:15, color:T.mid, lineHeight:1.7, fontStyle:'italic', marginBottom:20 }}>"{t}"</p>
+      <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+        <div style={{ width:40, height:40, borderRadius:'50%', background:T.sageG, display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>{e}</div>
+        <div>
+          <p style={{ fontWeight:700, fontSize:14, color:T.dark, margin:0 }}>{n}</p>
+          <p style={{ fontSize:12, color:T.muted, margin:0 }}>{r}</p>
+        </div>
+      </div>
     </div>
   )
 }
