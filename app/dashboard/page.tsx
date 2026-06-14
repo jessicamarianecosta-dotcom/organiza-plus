@@ -6,6 +6,7 @@ import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { supabase, Profile, Appointment } from '@/lib/supabase'
 import { T, GlobalStyles, Btn, Badge, Input, Alert, ProgressBar } from '@/lib/ds'
+import DynamicSpecialties from '@/lib/DynamicSpecialties'
 import { LayoutDashboard, Calendar, Users, Clock, Settings, Globe, LogOut, TrendingUp, CreditCard, ExternalLink, CheckCircle, XCircle, X, Menu, ChevronRight, Bell, Upload } from 'lucide-react'
 
 const DAYS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
@@ -450,7 +451,7 @@ function ProfileTab({ profile, onSave }: { profile: Profile|null, onSave:()=>voi
 
   async function save(e: React.FormEvent) {
     e.preventDefault(); if (!profile) return; setSaving(true)
-    await supabase.from('profiles').update({ name:form.name, bio:form.bio, whatsapp:form.whatsapp, city:form.city, state:form.state, crm_cro_crp:form.crm, instagram:form.instagram, specialties:form.specialties.split(',').map(s=>s.trim()).filter(Boolean) }).eq('id',profile.id)
+    await supabase.from('profiles').update({ name:form.name, bio:form.bio, whatsapp:form.whatsapp, city:form.city, state:form.state, crm_cro_crp:form.crm, instagram:form.instagram, specialties:form.specialties ? form.specialties.split(',').map((s:string)=>s.trim()).filter(Boolean) : [] }).eq('id',profile.id)
     setSaving(false); setSaved(true); onSave(); setTimeout(()=>setSaved(false),2500)
   }
 
@@ -490,8 +491,14 @@ function ProfileTab({ profile, onSave }: { profile: Profile|null, onSave:()=>voi
           ))}
         </div>
         <div style={{ marginTop:4 }}>
-          <label style={{ display:'block', fontSize:13, fontWeight:600, color:T.dark, marginBottom:6 }}>Especialidades <span style={{ color:T.muted, fontWeight:400 }}>(separadas por vírgula)</span></label>
-          <InputF value={form.specialties} onChange={v=>upd('specialties',v)} placeholder="Ansiedade, Depressão, TCC"/>
+          <label style={{ display:'block', fontSize:13, fontWeight:600, color:T.dark, marginBottom:10 }}>Especialidades</label>
+          <div style={{ background:T.off, borderRadius:T.r12, padding:'16px', border:`1px solid ${T.nude}` }}>
+            <DynamicSpecialties
+              profession={profile?.profession || ''}
+              value={form.specialties ? form.specialties.split(',').map((s:string)=>s.trim()).filter(Boolean) : []}
+              onChange={specs => upd('specialties', specs.join(', '))}
+            />
+          </div>
         </div>
         <div style={{ marginTop:4 }}>
           <label style={{ display:'block', fontSize:13, fontWeight:600, color:T.dark, marginBottom:6 }}>Bio</label>

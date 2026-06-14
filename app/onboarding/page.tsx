@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { T, GlobalStyles } from '@/lib/ds'
+import DynamicSpecialties from '@/lib/DynamicSpecialties'
 import { Upload, Clock, Globe, Sparkles, ArrowRight, Check, ChevronRight } from 'lucide-react'
 
 // ─── DATA ──────────────────────────────────────────────────────────────────
@@ -14,19 +15,6 @@ const PROFESSIONS = [
   { label:'Coach',        icon:'🎯' }, { label:'Educador Físico',icon:'🏃' },
   { label:'Outro',        icon:'✦'  },
 ]
-
-const SPECS_MAP: Record<string, string[]> = {
-  'Psicólogo(a)':   ['Ansiedade','Depressão','TCC','Psicanálise','Relacionamentos','Autoconhecimento','TDAH','Trauma'],
-  'Psiquiatra':     ['Transtorno Bipolar','Esquizofrenia','Depressão','Ansiedade','TOC','TDAH'],
-  'Nutricionista':  ['Emagrecimento','Hipertrofia','Vegano','Diabetes','Esportiva','Infantil'],
-  'Fisioterapeuta': ['Ortopédia','Neurológica','Pós-cirúrgico','Pilates','RPG','Estética'],
-  'Médico(a)':      ['Clínica Geral','Cardiologia','Dermatologia','Ginecologia','Ortopedia'],
-  'Dentista':       ['Clínica Geral','Ortodontia','Implante','Estética','Endodontia'],
-  'Esteticista':    ['Facial','Corporal','Limpeza de Pele','Drenagem','Massagem'],
-  'Terapeuta':      ['Reiki','Acupuntura','Aromaterapia','Hipnose','Meditação'],
-  'Coach':          ['Life Coaching','Executive Coaching','Carreira','Financeiro'],
-  'Educador Físico':['Personal Trainer','Musculação','Funcional','Cardio'],
-}
 
 const THEMES = [
   { id:'sage',       name:'Verde Sage',    desc:'Saúde e calma',        primary:'#7A9E87', dark:'#2C3530', glow:'#EAF3EC', pale:'#D6E8DA', light:'#A8C4AD' },
@@ -160,7 +148,6 @@ export default function Onboarding() {
     })
   }, [router])
 
-  function toggleSpec(s: string) { setSpecs(p => p.includes(s) ? p.filter(x=>x!==s) : [...p,s]) }
   function toggleDay(d: number) { setAvail(p => p.some(a=>a.day===d) ? p.filter(a=>a.day!==d) : [...p,{day:d,start:'08:00',end:'18:00'}].sort((a,b)=>a.day-b.day)) }
   function updAvail(d: number, k: string, v: string) { setAvail(p => p.map(a => a.day===d ? {...a,[k]:v} : a)) }
 
@@ -285,21 +272,18 @@ export default function Onboarding() {
             )}
 
             {/* Specialties */}
-            {profession && SPECS_MAP[profession] && (
-              <div style={{ background:T.white, borderRadius:T.r16, padding:'18px', boxShadow:T.shadowCard, marginBottom:20 }}>
-                <p style={{ fontSize:13, fontWeight:700, color:T.dark, marginBottom:12 }}>
-                  Especialidades <span style={{ color:T.muted, fontWeight:400 }}>(selecione todas que se aplicam)</span>
-                </p>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
-                  {SPECS_MAP[profession].map(s => (
-                    <button key={s} type="button" onClick={()=>toggleSpec(s)}
-                      style={{ padding:'7px 14px', borderRadius:T.r100, border:`2px solid ${specs.includes(s)?th.primary:T.nude}`, background:specs.includes(s)?th.primary:T.white, color:specs.includes(s)?T.cream:T.mid, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:T.fontSans, transition:'all 0.15s' }}>
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Dynamic specialties with custom add */}
+            <div style={{ background:T.white, borderRadius:T.r16, padding:'18px', boxShadow:T.shadowCard, marginBottom:20 }}>
+              <p style={{ fontSize:13, fontWeight:700, color:T.dark, marginBottom:14 }}>
+                Especialidades <span style={{ color:T.muted, fontWeight:400 }}>(selecione e adicione as suas)</span>
+              </p>
+              <DynamicSpecialties
+                profession={profession}
+                value={specs}
+                onChange={setSpecs}
+                theme={th}
+              />
+            </div>
 
             {/* Tipo de atendimento */}
             <div style={{ background:T.white, borderRadius:T.r16, padding:'18px', boxShadow:T.shadowCard, marginBottom:28 }}>
