@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { T, GlobalStyles } from '@/lib/ds'
 import DynamicSpecialties from '@/lib/DynamicSpecialties'
+import ScheduleConfig, { defaultWeek, weekConfigToRows, WeekConfig, BlockedSlot } from '@/lib/ScheduleConfig'
 import { Upload, Clock, Globe, Sparkles, ArrowRight, Check, ChevronRight } from 'lucide-react'
 
 // ─── DATA ──────────────────────────────────────────────────────────────────
@@ -122,12 +123,9 @@ export default function Onboarding() {
   const [instagram, setInstagram] = useState('')
   const [bio, setBio] = useState('')
 
-  // Step 4 — availability
-  const [avail, setAvail] = useState<{day:number,start:string,end:string}[]>([
-    {day:1,start:'08:00',end:'18:00'},{day:2,start:'08:00',end:'18:00'},
-    {day:3,start:'08:00',end:'18:00'},{day:4,start:'08:00',end:'18:00'},
-    {day:5,start:'08:00',end:'18:00'},
-  ])
+  // Step 4 — advanced schedule
+  const [weekConfig, setWeekConfig] = useState<WeekConfig>(defaultWeek())
+  const [blockedSlots, setBlockedSlots] = useState<BlockedSlot[]>([])
 
   useEffect(() => {
     setMounted(true)
@@ -148,8 +146,6 @@ export default function Onboarding() {
     })
   }, [router])
 
-  function toggleDay(d: number) { setAvail(p => p.some(a=>a.day===d) ? p.filter(a=>a.day!==d) : [...p,{day:d,start:'08:00',end:'18:00'}].sort((a,b)=>a.day-b.day)) }
-  function updAvail(d: number, k: string, v: string) { setAvail(p => p.map(a => a.day===d ? {...a,[k]:v} : a)) }
 
   async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return
@@ -187,9 +183,25 @@ export default function Onboarding() {
 
   async function saveStep4() {
     setSaving(true)
+    // Save availability rows with full config
     await supabase.from('availability').delete().eq('professional_id', pid)
-    if (avail.length > 0) {
-      await supabase.from('availability').insert(avail.map(a => ({ professional_id:pid, day_of_week:a.day, start_time:a.start, end_time:a.end, slot_minutes:60 })))
+    const rows = weekConfigToRows(pid, weekConfig)
+    if (rows.length > 0) {
+      await supabase.from('availability').insert(rows)
+    }
+    // Save blocked slots
+    if (blockedSlots.length > 0) {
+      await supabase.from('blocked_slots').delete().eq('professional_id', pid)
+      await supabase.from('blocked_slots').insert(
+        blockedSlots.map(b => ({
+          professional_id: pid,
+          blocked_date: b.date,
+          all_day: b.allDay,
+          start_time: b.startTime || null,
+          end_time: b.endTime || null,
+          reason: b.reason || null,
+        }))
+      )
     }
     setSaving(false); setStep(5)
   }
@@ -414,45 +426,25 @@ export default function Onboarding() {
           </div>
         )}
 
-        {/* STEP 4 — HORÁRIOS */}
+        {/* STEP 4 — HORÁRIOS AVANÇADOS */}
         {step===4 && (
           <div style={{ animation:'fadeIn 0.4s ease' }}>
             <h1 style={{ fontFamily:T.fontSerif, fontSize:'clamp(28px,5vw,42px)', color:T.dark, margin:'0 0 8px' }}>
               Horários de atendimento 📅
             </h1>
-            <p style={{ fontSize:15, color:T.muted, marginBottom:28 }}>Clientes só poderão agendar nos horários definidos aqui.</p>
+            <p style={{ fontSize:15, color:T.muted, marginBottom:24 }}>
+              Configure seus dias, duração das consultas, intervalo de almoço e bloqueios.
+            </p>
 
-            <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:22, marginBottom:16 }}>
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                {DAYS.map((day, i) => {
-                  const a = avail.find(x => x.day===i)
-                  return (
-                    <div key={day} style={{ display:'flex', alignItems:'center', gap:12, padding:'13px 16px', borderRadius:T.r14, border:`2px solid ${a?th.pale:T.nude}`, background:a?th.glow:T.off, transition:'all 0.15s' }}>
-                      <button type="button" onClick={()=>toggleDay(i)}
-                        style={{ width:22, height:22, borderRadius:6, border:`2px solid ${a?th.primary:T.nude}`, background:a?th.primary:T.white, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0, transition:'all 0.15s' }}>
-                        {a && <span style={{ color:T.cream, fontSize:12, fontWeight:700 }}>✓</span>}
-                      </button>
-                      <span style={{ fontSize:14, fontWeight:600, color:a?T.dark:T.muted, width:80, flexShrink:0 }}>{day}</span>
-                      {a ? (
-                        <div style={{ display:'flex', alignItems:'center', gap:8, flex:1, flexWrap:'wrap' }}>
-                          <input type="time" value={a.start} onChange={e=>updAvail(i,'start',e.target.value)}
-                            style={{ border:`1px solid ${th.pale}`, background:T.white, borderRadius:T.r10, padding:'7px 12px', fontSize:13, outline:'none', color:T.dark, fontFamily:T.fontSans }}/>
-                          <span style={{ fontSize:12, color:T.muted }}>até</span>
-                          <input type="time" value={a.end} onChange={e=>updAvail(i,'end',e.target.value)}
-                            style={{ border:`1px solid ${th.pale}`, background:T.white, borderRadius:T.r10, padding:'7px 12px', fontSize:13, outline:'none', color:T.dark, fontFamily:T.fontSans }}/>
-                        </div>
-                      ) : (
-                        <span style={{ fontSize:13, color:T.muted, fontStyle:'italic' }}>Clique para ativar</span>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div style={{ background:th.glow, border:`1px solid ${th.pale}`, borderRadius:T.r14, padding:'13px 16px', marginBottom:24, display:'flex', gap:10, alignItems:'flex-start' }}>
-              <Clock size={15} style={{ color:th.primary, marginTop:2, flexShrink:0 }}/>
-              <p style={{ fontSize:13, color:th.primary, margin:0 }}>Blocos de <strong>1 hora</strong> por padrão. Ajuste nas configurações do painel depois.</p>
+            <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:'20px', marginBottom:16 }}>
+              <ScheduleConfig
+                value={weekConfig}
+                onChange={setWeekConfig}
+                blocked={blockedSlots}
+                onBlockedChange={setBlockedSlots}
+                theme={{ primary:th.primary, glow:th.glow, pale:th.pale }}
+                showBlocked={true}
+              />
             </div>
 
             <div style={{ display:'flex', gap:10 }}>
