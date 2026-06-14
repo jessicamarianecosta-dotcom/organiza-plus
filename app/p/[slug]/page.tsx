@@ -383,11 +383,24 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
                 Seu emocional merece atenção. Conheça as áreas em que ofereço suporte.
               </p>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:16 }}>
-              {profile.specialties.map(s => (
-                <SpecCard key={s} label={s} icon={SPEC_ICONS[s]||'💚'} th={th}/>
-              ))}
-            </div>
+            {(() => {
+              const EXTRAS = ['Autoestima','Burnout','Inteligência Emocional','Desenvolvimento Pessoal','Bem-estar','Equilíbrio Emocional']
+              const base = profile.specialties || []
+              let filled = [...base]
+              const remainder = filled.length % 3
+              if (remainder !== 0) {
+                const needed = 3 - remainder
+                const pool = EXTRAS.filter(e => !filled.includes(e))
+                filled = [...filled, ...pool.slice(0, needed)]
+              }
+              return (
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16 }}>
+                  {filled.map(s => (
+                    <SpecCard key={s} label={s} icon={SPEC_ICONS[s]||'💚'} th={th}/>
+                  ))}
+                </div>
+              )
+            })()}
           </div>
         </section>
       )}
