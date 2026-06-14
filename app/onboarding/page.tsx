@@ -116,7 +116,8 @@ export default function Onboarding() {
   const [mounted, setMounted] = useState(false)
 
   // Step 1
-  const [profession, setProfession] = useState('')
+  const [profession, setProfession]             = useState('')
+  const [customProfession, setCustomProfession] = useState('')
   const [specs, setSpecs] = useState<string[]>([])
   const [online, setOnline] = useState(false)
   const [inPerson, setInPerson] = useState(true)
@@ -174,8 +175,9 @@ export default function Onboarding() {
   }
 
   async function saveStep1() {
+    const finalProf = profession === 'Outro' ? (customProfession.trim() || 'Outro') : profession
     setSaving(true)
-    await supabase.from('profiles').update({ profession, specialties:specs, online, in_person:inPerson }).eq('id', pid)
+    await supabase.from('profiles').update({ profession:finalProf, specialties:specs, online, in_person:inPerson }).eq('id', pid)
     setSaving(false); setStep(2)
   }
 
@@ -274,6 +276,14 @@ export default function Onboarding() {
               ))}
             </div>
 
+            {/* Custom profession input */}
+            {profession === 'Outro' && (
+              <div style={{ background:T.white, borderRadius:T.r16, padding:'16px 18px', boxShadow:T.shadowCard, marginBottom:16 }}>
+                <p style={{ fontSize:13, fontWeight:700, color:T.dark, marginBottom:8 }}>Qual é a sua profissão? *</p>
+                <FI value={customProfession} set={setCustomProfession} placeholder="Ex: Biomédico, Quiropraxista, Advogado, Fonoaudiólogo..."/>
+              </div>
+            )}
+
             {/* Specialties */}
             {profession && SPECS_MAP[profession] && (
               <div style={{ background:T.white, borderRadius:T.r16, padding:'18px', boxShadow:T.shadowCard, marginBottom:20 }}>
@@ -305,7 +315,7 @@ export default function Onboarding() {
               </div>
             </div>
 
-            <PrimaryBtn onClick={saveStep1} disabled={!profession} loading={saving}>
+            <PrimaryBtn onClick={saveStep1} disabled={!profession || (profession==='Outro' && !customProfession.trim())} loading={saving}>
               Continuar <ChevronRight size={18}/>
             </PrimaryBtn>
           </div>

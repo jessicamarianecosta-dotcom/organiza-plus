@@ -2,6 +2,7 @@
 import { useState, useEffect, use, useRef } from 'react'
 import { supabase, Profile, Availability } from '@/lib/supabase'
 import { T, GlobalStyles } from '@/lib/ds'
+import { getTemplate } from '@/lib/templates'
 import { MapPin, Clock, Monitor, Heart, Phone, ChevronRight, Star, Shield, ArrowRight, Check } from 'lucide-react'
 import { format, addDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -52,6 +53,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
   const [loading, setLoading]   = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [th, setTh]             = useState(THEMES.sage)
+  const [tmpl, setTmpl]         = useState<ReturnType<typeof getTemplate>|null>(null)
 
   // Booking state
   const [selDate, setSelDate]   = useState<string|null>(null)
@@ -77,6 +79,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
       setProfile(p)
       const tc = (p as any).theme_color
       if (tc && THEMES[tc]) setTh(THEMES[tc])
+      setTmpl(getTemplate(p.profession || ''))
       supabase.from('availability').select('*').eq('professional_id', p.id).eq('active', true).then(({ data }) => setAvail(data||[]))
       setLoading(false)
       track(p.id, 'page_view')
@@ -182,7 +185,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
           style={{ background:th.primary, color:'#FAFAF7', padding:'9px 20px', borderRadius:T.r100, fontSize:13, fontWeight:700, border:'none', cursor:'pointer', fontFamily:T.fontSans, boxShadow:`0 4px 14px ${th.primary}44`, transition:'all 0.2s' }}
           onMouseEnter={e=>{e.currentTarget.style.background=th.mid;e.currentTarget.style.transform='translateY(-1px)'}}
           onMouseLeave={e=>{e.currentTarget.style.background=th.primary;e.currentTarget.style.transform='translateY(0)'}}>
-          Agendar consulta
+          {tmpl?.hero.cta || 'Agendar consulta'}
         </button>
       </nav>
 
@@ -239,7 +242,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
               }}
                 onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow=`0 12px 32px ${th.primary}66`}}
                 onMouseLeave={e=>{e.currentTarget.style.transform='translateY(0)';e.currentTarget.style.boxShadow=`0 8px 24px ${th.primary}55`}}>
-                Agendar consulta <ArrowRight size={17}/>
+  {tmpl?.hero.cta || 'Agendar'} <ArrowRight size={17}/>
               </button>
               {wppLink && (
                 <a href={wppLink} target="_blank" rel="noopener" onClick={()=>track(profile!.id,'whatsapp_click')} style={{
@@ -299,7 +302,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
       {/* ── EMOTIONAL QUOTE ────────────────────────────────────────────────── */}
       <section style={{ padding:'48px 24px', background:th.glow, borderTop:`1px solid ${th.pale}`, borderBottom:`1px solid ${th.pale}`, textAlign:'center' }}>
         <p style={{ fontFamily:T.fontSerif, fontSize:'clamp(18px,3vw,26px)', color:th.dark, fontStyle:'italic', maxWidth:640, margin:'0 auto' }}>
-          "Você não precisa enfrentar tudo sozinho. Cuidar da mente também é prioridade."
+          "{tmpl?.quote || 'Cuidar de si mesmo é o primeiro passo para uma vida plena.'}"
         </p>
       </section>
 
@@ -315,18 +318,18 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
                 <Heart size={12}/> Sobre mim
               </div>
               <h2 style={{ fontFamily:T.fontSerif, fontSize:'clamp(26px,4vw,40px)', color:T.dark, margin:'0 0 20px', lineHeight:1.15 }}>
-                Conheça <em style={{ color:th.primary, fontStyle:'italic' }}>minha história</em>
+                {tmpl?.about.title || 'Sobre mim'}
               </h2>
               <p style={{ fontSize:16, color:T.mid, lineHeight:1.85, marginBottom:28 }}>{profile.bio}</p>
 
               {/* Values */}
               <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-                {[
-                  'Escuta ativa e sem julgamentos',
-                  'Terapia baseada em evidências científicas',
-                  'Ambiente acolhedor e seguro',
-                  'Desenvolvimento emocional contínuo',
-                ].map(v => (
+                {(tmpl?.about.values || [
+                  'Atendimento personalizado e cuidadoso',
+                  'Foco nos seus objetivos',
+                  'Experiência e qualificação',
+                  'Acompanhamento contínuo',
+                ]).map(v => (
                   <div key={v} style={{ display:'flex', alignItems:'center', gap:12, fontSize:14, color:T.mid, fontWeight:500 }}>
                     <div style={{ width:22, height:22, borderRadius:'50%', background:th.glow, border:`1px solid ${th.pale}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                       <Check size={11} color={th.primary} strokeWidth={3}/>
@@ -369,7 +372,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
       )}
 
       {/* ── ESPECIALIDADES ─────────────────────────────────────────────────── */}
-      {profile.specialties && profile.specialties.length > 0 && (
+      {((profile.specialties && profile.specialties.length > 0) || (tmpl?.defaultSpecs && tmpl.defaultSpecs.length > 0)) && (
         <section style={{ padding:'96px 24px', background:T.off }}>
           <div style={{ maxWidth:1080, margin:'0 auto' }}>
             <div style={{ textAlign:'center', marginBottom:56 }}>
@@ -377,15 +380,15 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
                 🧠 Áreas de atuação
               </div>
               <h2 style={{ fontFamily:T.fontSerif, fontSize:'clamp(26px,4vw,40px)', color:T.dark, margin:'0 0 12px' }}>
-                Como posso <em style={{ color:th.primary, fontStyle:'italic' }}>te ajudar</em>
+                {tmpl?.specialties.title || 'Áreas de atuação'}
               </h2>
               <p style={{ fontSize:16, color:T.muted, maxWidth:500, margin:'0 auto' }}>
-                Seu emocional merece atenção. Conheça as áreas em que ofereço suporte.
+                {tmpl?.specialties.sub || 'Conheça as áreas em que ofereço atendimento especializado.'}
               </p>
             </div>
             {(() => {
-              const EXTRAS = ['Autoestima','Burnout','Inteligência Emocional','Desenvolvimento Pessoal','Bem-estar','Equilíbrio Emocional']
-              const base = profile.specialties || []
+              const EXTRAS = tmpl?.specialties.extras || ['Atendimento Personalizado','Acompanhamento','Desenvolvimento','Bem-estar','Qualidade de Vida','Excelência']
+              const base = (profile.specialties && profile.specialties.length > 0) ? profile.specialties : (tmpl?.defaultSpecs || [])
               let filled = [...base]
               const remainder = filled.length % 3
               if (remainder !== 0) {
@@ -438,7 +441,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
         <div style={{ maxWidth:680, margin:'0 auto', position:'relative', zIndex:1 }}>
           <div style={{ fontSize:36, marginBottom:16, animation:'float 3s ease-in-out infinite' }}>🌿</div>
           <p style={{ fontFamily:T.fontSerif, fontSize:'clamp(20px,3vw,32px)', color:T.cream, lineHeight:1.4, margin:'0 0 24px', fontStyle:'italic' }}>
-            "Seu emocional merece a mesma atenção que você dá à sua saúde física."
+            "{tmpl?.quote || 'Excelência é um compromisso com o cuidado genuíno.'}"
           </p>
           <button onClick={scrollToBook} style={{
             background:th.primary, color:'#FAFAF7', padding:'14px 32px',
@@ -447,7 +450,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
           }}
             onMouseEnter={e=>e.currentTarget.style.transform='translateY(-2px)'}
             onMouseLeave={e=>e.currentTarget.style.transform='translateY(0)'}>
-            Agendar minha consulta →
+            {tmpl?.hero.cta || 'Agendar minha consulta'} →
           </button>
         </div>
       </section>
@@ -491,7 +494,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
                 <p style={{ fontSize:15, color:T.muted, marginBottom:6 }}>📅 <strong>{selDate}</strong> às <strong>{selTime}</strong></p>
                 {clientEmail && <p style={{ fontSize:14, color:T.muted, marginBottom:28 }}>Confirmação enviada para <strong>{clientEmail}</strong></p>}
                 <div style={{ background:th.glow, border:`1px solid ${th.pale}`, borderRadius:T.r16, padding:'16px 20px', maxWidth:360, margin:'0 auto 28px', fontSize:14, color:th.mid, lineHeight:1.6 }}>
-                  Em breve você receberá uma confirmação. Qualquer dúvida, fale pelo WhatsApp.
+                  {tmpl?.booking.confirmMsg || 'Em breve você receberá uma confirmação. Qualquer dúvida, fale pelo WhatsApp.'}
                 </div>
                 {wppLink && (
                   <a href={wppLink} target="_blank" rel="noopener" style={{ display:'inline-flex', alignItems:'center', gap:8, background:'#25D366', color:'white', padding:'13px 24px', borderRadius:T.r14, fontSize:14, fontWeight:700, textDecoration:'none' }}>

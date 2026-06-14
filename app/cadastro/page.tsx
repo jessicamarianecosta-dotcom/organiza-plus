@@ -39,6 +39,7 @@ function CadastroForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [profession, setProfession] = useState('')
+  const [customProf, setCustomProf] = useState('')
 
   useEffect(() => {
     setMounted(true)
@@ -86,6 +87,7 @@ function CadastroForm() {
 
       const uid = data.user?.id
       if (!uid) { setError('Erro ao criar conta. Tente novamente.'); setLoading(false); return }
+      const finalProfession = profession === 'Outro' ? (customProf.trim() || 'Outro') : profession
 
       // 2. Update profile with name + profession (trigger may have used email as name)
       let slug = slugify(name)
@@ -93,7 +95,7 @@ function CadastroForm() {
       if (existing && existing.length > 0) slug = `${slug}-${Math.random().toString(36).slice(2,5)}`
 
       await supabase.from('profiles').upsert({
-        id: uid, name, slug, profession, plan: plano,
+        id: uid, name, slug, profession: finalProfession, plan: plano,
         plan_active: true, online: false, in_person: true, onboarding_done: false,
       })
 
@@ -208,7 +210,7 @@ function CadastroForm() {
                   ←
                 </button>
                 <button type="submit" disabled={loading||!profession}
-                  style={{ flex:1, padding:'14px', fontSize:15, fontWeight:700, color:C.cream, background:loading?C.muted:C.dark, border:'none', borderRadius:12, cursor:loading?'not-allowed':'pointer', fontFamily:'inherit', transition:'background 0.2s', opacity:!profession?0.4:1 }}
+                  style={{ flex:1, padding:'14px', fontSize:15, fontWeight:700, color:C.cream, background:loading?C.muted:C.dark, border:'none', borderRadius:12, cursor:loading?'not-allowed':'pointer', fontFamily:'inherit', transition:'background 0.2s', opacity:(!profession||(profession==='Outro'&&!customProf.trim()))?0.4:1 }}
                   onMouseEnter={e=>{if(!loading)e.currentTarget.style.background=C.sage}} onMouseLeave={e=>{if(!loading)e.currentTarget.style.background=C.dark}}>
                   {loading ? 'Criando conta...' : 'Criar minha conta →'}
                 </button>
