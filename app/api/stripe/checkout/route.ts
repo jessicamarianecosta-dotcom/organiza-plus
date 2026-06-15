@@ -1,34 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server'
+import Stripe from 'stripe'
 
-const PLANS = {
-  basic:   { price: 2700, name: '🌿 Organiza+ Basic' },
-  premium: { price: 4700, name: '💎 Organiza+ Premium' },
-}
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://organiza-plus-five.vercel.app'
 
 export async function POST(req: NextRequest) {
+  const key = process.env.STRIPE_SECRET_KEY
+  if (!key) {
+    return NextResponse.json(
+      { error: 'Stripe não configurado. Adicione STRIPE_SECRET_KEY no Vercel.' },
+      { status: 503 }
+    )
+  }
+
   try {
-    const { default: Stripe } = await import('stripe')
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', { apiVersion: '2026-05-27.dahlia' })
-
+    const stripe = new Stripe(key)
     const { plan, userId, email } = await req.json()
-    const planData = PLANS[plan as keyof typeof PLANS]
-    if (!planData) return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
 
-    if (!process.env.STRIPE_SECRET_KEY) {
-      return NextResponse.json({ error: 'Stripe não configurado. Adicione STRIPE_SECRET_KEY nas variáveis de ambiente do Vercel.' }, { status: 503 })
+    const PLANS: Record<string, { name: string; amount: number; priceId?: string }> = {
+      basic:   { name: '🌿 Organiza+ Basic',   amount: 2700, priceId: process.env.STRIPE_PRICE_BASIC },
+      premium: { name: '💎 Organiza+ Premium', amount: 4700, priceId: process.env.STRIPE_PRICE_PREMIUM },
     }
+
+    const planData = PLANS[plan]
+    if (!planData) return NextResponse.json({ error: 'Plano inválido.' }, { status: 400 })
+
+    const lineItem: Stripe.Checkout.SessionCreateParams.LineItem = planData.priceId
+      ? { price: planData.priceId, quantity: 1 }
+      : {
+          price_data: {
+            currency: 'brl',
+            product_data: { name: planData.name },
+            recurring: { interval: 'month' },
+            unit_amount: planData.amount,
+          },
+          quantity: 1,
+        }
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       payment_method_types: ['card'],
       customer_email: email,
-      line_items: [{ price_data: { currency: 'brl', product_data: { name: planData.name }, recurring: { interval: 'month' }, unit_amount: planData.price }, quantity: 1 }],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://organiza-plus-five.vercel.app'}/dashboard?payment=success`,
-      cancel_url:  `${process.env.NEXT_PUBLIC_APP_URL || 'https://organiza-plus-five.vercel.app'}/planos`,
-      metadata: { userId, plan },
+      line_items: [lineItem],
+      success_url: `${APP_URL}/dashboard?payment=success&plan=${plan}`,
+      cancel_url:  `${APP_URL}/planos?cancelled=1`,
+      metadata:    { userId, plan },
+      subscription_data: { metadata: { userId, plan } },
+      locale: 'pt-BR',
+      allow_promotion_codes: true,
     })
+
     return NextResponse.json({ url: session.url })
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+  } catch (err: any) {
+    console.error('Stripe checkout error:', err)
+    return NextResponse.json({ error: err.message || 'Erro interno.' }, { status: 500 })
   }
 }
