@@ -290,12 +290,11 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
             </div>
 
             <h1 style={{ fontFamily:T.fontSerif, fontSize:'clamp(36px,5vw,58px)', color:'#FAFAF7', lineHeight:1.08, margin:'0 0 20px', letterSpacing:'-0.02em' }}>
-              Um espaço seguro para cuidar da sua{' '}
-              <em style={{ color:th.light, fontStyle:'italic' }}>saúde emocional.</em>
+              {tmpl?.hero.headline || 'Um atendimento profissional pensado para você.'}
             </h1>
 
             <p style={{ fontSize:'clamp(15px,2vw,18px)', color:'rgba(255,255,255,0.6)', lineHeight:1.7, marginBottom:36, maxWidth:480 }}>
-              Atendimento acolhedor e profissional para ajudar você a viver com mais leveza e equilíbrio.
+              {tmpl?.hero.sub || 'Conecte-se com seus clientes de forma moderna, profissional e acolhedora.'}
             </p>
 
             {/* CTAs */}
