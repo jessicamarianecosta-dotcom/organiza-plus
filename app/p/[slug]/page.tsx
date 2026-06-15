@@ -37,10 +37,53 @@ async function track(pid:string, type:string) {
 
 // ── Specialty icons ────────────────────────────────────────────────────────
 const SPEC_ICONS: Record<string,string> = {
+  // Psicologia
   'Ansiedade':'🌿','Depressão':'💙','TCC':'🧠','Psicanálise':'📖',
   'Relacionamentos':'💑','Autoconhecimento':'🔍','TDAH':'✨','Trauma':'🌱',
-  'Autoestima':'💛','Psicologia Infantil':'🌟','TOC':'🔄','Luto':'🕊️',
-  'Fobia':'🛡️','Síndrome do Pânico':'🌬️','Burnout':'🔋','Insônia':'🌙',
+  'Psicologia Infantil':'🌟','TOC':'🔄','Luto':'🕊️','Fobia':'🛡️','Fobias':'🛡️',
+  'Síndrome do Pânico':'🌬️','Burnout':'🔋','Insônia':'🌙',
+  // Universal
+  'Autoestima':'💛','Bem-estar':'🌸','Inteligência Emocional':'💡',
+  'Desenvolvimento Pessoal':'🌱','Equilíbrio Emocional':'⚖️','Motivação':'🔥',
+  'Saúde Mental':'🧠','Prevenção':'🛡️','Qualidade de Vida':'🌟','Longevidade':'⏳',
+  // Psiquiatria
+  'Transtorno Bipolar':'🔵','Esquizofrenia':'🌀','Dependência Química':'🧪',
+  'Transtorno de Personalidade':'🧬','Avaliação Diagnóstica':'📋',
+  // Nutrição
+  'Emagrecimento':'⚖️','Hipertrofia':'💪','Diabetes':'🩸','Vegano/Vegetariano':'🥗',
+  'Alimentação Esportiva':'🏃','Nutrição Funcional':'🥦','Saúde Intestinal':'🫁',
+  'Gestação':'🤱','Oncológica':'🎗️','Infantil':'👶','Reeducação Alimentar':'🍽️',
+  // Fisioterapia
+  'Ortopedia':'🦴','Neurológica':'🧠','Pós-operatório':'🏥','Pilates':'🤸',
+  'RPG':'🧘','Estética':'✨','Respiratória':'🫁','Pediatria':'👶',
+  'Geriatria':'👴','Dor Crônica':'💊','Reabilitação':'🔄',
+  'Prevenção de Lesões':'🛡️','Equilíbrio Postural':'⚖️',
+  // Médico
+  'Clínica Geral':'⚕️','Cardiologia':'❤️','Dermatologia':'🌸','Endocrinologia':'🧬',
+  'Ginecologia':'🌺','Saúde Preventiva':'🛡️','Check-up':'📋','Doenças Crônicas':'💊',
+  // Dentista
+  'Ortodontia':'🦷','Implante':'🔩','Endodontia':'🔬','Periodontia':'🌿',
+  'Odontopediatria':'👶','Harmonização Facial':'✨','Prótese':'🦷',
+  'Estética Dental':'💎','Saúde Bucal':'🦷','Sorriso Harmonioso':'😊',
+  // Esteticista
+  'Limpeza de Pele':'🫧','Facial':'🌸','Corporal':'💆','Drenagem':'🌊',
+  'Massagem':'🤲','Microagulhamento':'💉','Depilação':'✨','Laser':'⚡',
+  'Peeling':'🌟','Radiofrequência':'📡','Rejuvenescimento':'✨','Relaxamento':'😌',
+  // Terapeuta
+  'Reiki':'✋','Acupuntura':'🪡','Constelação Familiar':'👨‍👩‍👧',
+  'Hipnoterapia':'🌀','Aromaterapia':'🌺','Meditação':'🧘',
+  'Barras de Access':'🤲','Thetahealing':'🌟','Terapia Holística':'🌿',
+  'Equilíbrio Energético':'⚡','Espiritualidade':'🌙',
+  // Coach
+  'Life Coaching':'🎯','Executive Coaching':'💼','Carreira':'📈',
+  'Financeiro':'💰','Liderança':'👑','Alta Performance':'⚡',
+  'Propósito':'🌟','Mindset':'🧠','Propósito de Vida':'🌟','Tomada de Decisão':'🎲',
+  // Fitness
+  'Personal Trainer':'💪','Musculação':'🏋️','Funcional':'⚡',
+  'Cardio':'🏃','CrossFit':'🔥','Esportes':'⚽','Natação':'🏊',
+  'Performance':'🏆','Condicionamento Físico':'🏅',
+  // Generic
+  'Consultoria':'💼','Atendimento Personalizado':'🤝','Excelência':'⭐',
 }
 
 // ── Main component ─────────────────────────────────────────────────────────
@@ -165,6 +208,29 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
         .fade-up-3 { animation: fadeUp 0.6s 0.3s ease both; }
         input::placeholder, textarea::placeholder { color: #8A9690; }
         * { box-sizing: border-box; }
+
+        /* Specs grid — responsive */
+        .specs-grid { grid-template-columns: repeat(3, 1fr); }
+        @media (max-width: 600px) {
+          .specs-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+        }
+        @media (max-width: 380px) {
+          .specs-grid { grid-template-columns: 1fr 1fr !important; }
+        }
+
+        /* Hero grid */
+        @media (max-width: 768px) {
+          .hero-grid  { grid-template-columns: 1fr !important; text-align: center; gap: 32px !important; }
+          .hero-img   { order: -1; display: flex !important; justify-content: center; }
+          .about-grid { grid-template-columns: 1fr !important; gap: 28px !important; }
+          .diff-grid  { grid-template-columns: 1fr !important; }
+          .form-grid  { grid-template-columns: 1fr !important; }
+          .footer-grid{ grid-template-columns: 1fr !important; gap: 20px !important; }
+        }
+
+        /* Prevent any horizontal overflow */
+        body, html { overflow-x: hidden; max-width: 100vw; }
+        img { max-width: 100%; }
       `}</style>
 
       {/* ── STICKY NAV ───────────────────────────────────────────────────── */}
@@ -193,7 +259,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
       <section style={{
         minHeight:'100vh', display:'flex', alignItems:'center',
         background:`linear-gradient(160deg, ${th.dark} 0%, ${th.dark}f0 55%, ${th.primary}30 100%)`,
-        position:'relative', overflow:'hidden', padding:'80px 24px 60px',
+        position:'relative', overflow:'hidden', padding:'clamp(72px,10vw,120px) clamp(16px,5vw,40px) clamp(40px,6vw,80px)',
       }}>
         {/* Decorative circles */}
         <div style={{ position:'absolute', top:-120, right:-120, width:500, height:500, borderRadius:'50%', background:`${th.primary}12`, pointerEvents:'none' }}/>
@@ -278,7 +344,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
           <div className="hero-img fade-up-2" style={{ display:'flex', justifyContent:'flex-end', position:'relative' }}>
             {/* Photo card */}
             <div style={{ position:'relative', display:'inline-block' }}>
-              <div style={{ width:'clamp(260px,35vw,380px)', height:'clamp(320px,44vw,460px)', borderRadius:28, overflow:'hidden', boxShadow:`0 32px 80px rgba(0,0,0,0.35)`, border:'3px solid rgba(255,255,255,0.12)', background:th.pale, display:'flex', alignItems:'center', justifyContent:'center', fontSize:80 }}>
+              <div style={{ width:'clamp(220px,80vw,380px)', height:'clamp(270px,55vw,460px)', maxWidth:'100%', borderRadius:28, overflow:'hidden', boxShadow:`0 32px 80px rgba(0,0,0,0.35)`, border:'3px solid rgba(255,255,255,0.12)', background:th.pale, display:'flex', alignItems:'center', justifyContent:'center', fontSize:80 }}>
                 {profile.photo_url
                   ? <img src={profile.photo_url} alt={profile.name} style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'top' }}/>
                   : '👩‍⚕️'}
@@ -308,7 +374,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
 
       {/* ── SOBRE MIM ──────────────────────────────────────────────────────── */}
       {profile.bio && (
-        <section style={{ padding:'96px 24px', background:T.cream }}>
+        <section style={{ padding:'clamp(48px,8vw,96px) clamp(16px,5vw,24px)', background:T.cream }}>
           <div style={{ maxWidth:1080, margin:'0 auto', display:'grid', gridTemplateColumns:'1fr 1fr', gap:72, alignItems:'center' }} className="about-grid">
             <style>{`@media(max-width:768px){.about-grid{grid-template-columns:1fr!important}}`}</style>
 
@@ -373,7 +439,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
 
       {/* ── ESPECIALIDADES ─────────────────────────────────────────────────── */}
       {((profile.specialties && profile.specialties.length > 0) || (tmpl?.defaultSpecs && tmpl.defaultSpecs.length > 0)) && (
-        <section style={{ padding:'96px 24px', background:T.off }}>
+        <section style={{ padding:'clamp(48px,8vw,96px) clamp(16px,5vw,24px)', background:T.off }}>
           <div style={{ maxWidth:1080, margin:'0 auto' }}>
             <div style={{ textAlign:'center', marginBottom:56 }}>
               <div style={{ display:'inline-flex', alignItems:'center', gap:8, background:th.glow, border:`1px solid ${th.pale}`, borderRadius:T.r100, padding:'5px 14px', fontSize:12, fontWeight:700, color:th.primary, marginBottom:16 }}>
@@ -397,7 +463,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
                 filled = [...filled, ...pool.slice(0, needed)]
               }
               return (
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16 }}>
+                <div className="specs-grid" style={{ display:'grid', gap:12 }}>
                   {filled.map(s => (
                     <SpecCard key={s} label={s} icon={SPEC_ICONS[s]||'💚'} th={th}/>
                   ))}
@@ -456,7 +522,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
       </section>
 
       {/* ── AGENDAMENTO ────────────────────────────────────────────────────── */}
-      <section id="agendar" ref={bookRef} style={{ padding:'96px 24px', background:T.off, scrollMarginTop:60 }}>
+      <section id="agendar" ref={bookRef} style={{ padding:'clamp(48px,8vw,96px) clamp(16px,5vw,24px)', background:T.off, scrollMarginTop:60 }}>
         <div style={{ maxWidth:800, margin:'0 auto' }}>
           <div style={{ textAlign:'center', marginBottom:48 }}>
             <div style={{ display:'inline-flex', alignItems:'center', gap:8, background:th.glow, border:`1px solid ${th.pale}`, borderRadius:T.r100, padding:'5px 14px', fontSize:12, fontWeight:700, color:th.primary, marginBottom:16 }}>
@@ -604,7 +670,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
       {/* ── FOOTER ─────────────────────────────────────────────────────────── */}
       <footer style={{ background:th.dark, padding:'48px 24px 32px' }}>
         <div style={{ maxWidth:1080, margin:'0 auto' }}>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:32, marginBottom:40 }}>
+          <div className="footer-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:24, marginBottom:32 }}>
             <div>
               <p style={{ fontFamily:T.fontSerif, fontSize:20, color:T.cream, margin:'0 0 8px' }}>{profile.name}</p>
               <p style={{ fontSize:13, color:'rgba(255,255,255,0.45)', margin:'0 0 16px' }}>{profile.profession}{profile.crm_cro_crp?` · ${profile.crm_cro_crp}`:''}</p>
@@ -662,9 +728,9 @@ function SpecCard({ label, icon, th }: { label:string, icon:string, th:any }) {
   const [h,setH] = useState(false)
   return (
     <div onMouseEnter={()=>setH(true)} onMouseLeave={()=>setH(false)}
-      style={{ background:h?th.glow:T.white, borderRadius:T.r20, padding:'24px 20px', border:`2px solid ${h?th.pale:T.nude}`, boxShadow:h?T.shadowMd:T.shadowCard, transition:'all 0.2s', cursor:'default', transform:h?'translateY(-3px)':'none' }}>
-      <div style={{ fontSize:32, marginBottom:14 }}>{icon}</div>
-      <p style={{ fontWeight:700, fontSize:15, color:T.dark, margin:0 }}>{label}</p>
+      style={{ background:h?th.glow:T.white, borderRadius:T.r16, padding:'18px 14px', border:`2px solid ${h?th.pale:T.nude}`, boxShadow:h?T.shadowMd:T.shadowCard, transition:'all 0.2s', cursor:'default', transform:h?'translateY(-3px)':'none', minWidth:0, wordBreak:'break-word' }}>
+      <div style={{ fontSize:28, marginBottom:10 }}>{icon}</div>
+      <p style={{ fontWeight:700, fontSize:13, color:T.dark, margin:0, lineHeight:1.3 }}>{label}</p>
     </div>
   )
 }
