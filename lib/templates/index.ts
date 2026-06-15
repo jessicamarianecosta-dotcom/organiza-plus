@@ -596,8 +596,15 @@ const TEMPLATES: ProfessionTemplate[] = [
  */
 export function getTemplate(profession: string): ProfessionTemplate {
   if (!profession) return TEMPLATES.find(t => t.key === 'generic')!
-  const lower = profession.toLowerCase()
-  const match = TEMPLATES.find(t => t.keywords.some(kw => lower.includes(kw)))
+  const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const lower = norm(profession)
+  const match = TEMPLATES.find(t =>
+    t.keywords.some(kw => {
+      const kwn = norm(kw)
+      // Must match as whole word — prevents "biomédico" matching "médico"
+      return new RegExp('(^|\\W)' + kwn + '(\\W|$)').test(lower) || lower === kwn
+    })
+  )
   return match || TEMPLATES.find(t => t.key === 'generic')!
 }
 
