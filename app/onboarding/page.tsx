@@ -5,7 +5,8 @@ import { supabase } from '@/lib/supabase'
 import { T, GlobalStyles } from '@/lib/ds'
 import DynamicSpecialties from '@/lib/DynamicSpecialties'
 import ScheduleConfig, { defaultWeek, weekConfigToRows, WeekConfig, BlockedSlot } from '@/lib/ScheduleConfig'
-import { Upload, Clock, Globe, Sparkles, ArrowRight, Check, ChevronRight } from 'lucide-react'
+import PhotoCropper from '@/lib/PhotoCropper'
+import { Clock, Globe, Sparkles, ArrowRight, Check, ChevronRight } from 'lucide-react'
 
 // ─── DATA ──────────────────────────────────────────────────────────────────
 const PROFESSIONS = [
@@ -94,13 +95,11 @@ function SecBtn({ children, onClick }: any) {
 // ─── MAIN COMPONENT ────────────────────────────────────────────────────────
 export default function Onboarding() {
   const router = useRouter()
-  const fileRef = useRef<HTMLInputElement>(null)
 
   const [step, setStep] = useState(1)
   const [pid, setPid] = useState('')
   const [slug, setSlug] = useState('')
   const [saving, setSaving] = useState(false)
-  const [uploading, setUploading] = useState(false)
   const [photoUrl, setPhotoUrl] = useState('')
   const [mounted, setMounted] = useState(false)
 
@@ -147,14 +146,11 @@ export default function Onboarding() {
   }, [router])
 
 
-  async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]; if (!file) return
-    setUploading(true)
+  async function uploadPhoto(file: File): Promise<string> {
     const fd = new FormData(); fd.append('file', file)
     const res = await fetch('/api/upload', { method:'POST', body:fd })
     const { url } = await res.json()
-    if (url) setPhotoUrl(url)
-    setUploading(false)
+    return url || ''
   }
 
   async function saveStep1() {
@@ -390,20 +386,15 @@ export default function Onboarding() {
             </h1>
             <p style={{ fontSize:15, color:T.muted, marginBottom:28 }}>Essas informações aparecem na sua página pública.</p>
 
-            {/* Photo upload */}
-            <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:22, marginBottom:20, display:'flex', alignItems:'center', gap:18 }}>
-              <div style={{ width:80, height:80, borderRadius:'50%', background:T.sageG, border:`3px solid ${T.sageP}`, overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center', fontSize:32, flexShrink:0 }}>
-                {photoUrl ? <img src={photoUrl} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/> : '👤'}
-              </div>
-              <div>
-                <p style={{ fontWeight:700, color:T.dark, fontSize:14, marginBottom:4 }}>Foto de perfil</p>
-                <p style={{ fontSize:12, color:T.muted, marginBottom:10 }}>Uma foto profissional aumenta muito a confiança.</p>
-                <input ref={fileRef} type="file" accept="image/*" style={{ display:'none' }} onChange={handlePhoto}/>
-                <button type="button" onClick={()=>fileRef.current?.click()} disabled={uploading}
-                  style={{ display:'flex', alignItems:'center', gap:7, background:th.glow, border:`1px solid ${th.pale}`, color:th.primary, borderRadius:T.r12, padding:'8px 14px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:T.fontSans }}>
-                  <Upload size={13}/> {uploading ? 'Enviando...' : 'Adicionar foto'}
-                </button>
-              </div>
+            {/* Photo upload with cropper */}
+            <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:22, marginBottom:20 }}>
+              <p style={{ fontWeight:700, color:T.dark, fontSize:14, marginBottom:14 }}>Foto de perfil</p>
+              <PhotoCropper
+                value={photoUrl}
+                onChange={setPhotoUrl}
+                onUpload={uploadPhoto}
+                theme={{ primary:th.primary, glow:th.glow, pale:th.pale, dark:th.dark }}
+              />
             </div>
 
             <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:22, marginBottom:20 }}>
