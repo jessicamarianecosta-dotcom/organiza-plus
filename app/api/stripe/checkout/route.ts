@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://organiza-plus-five.vercel.app'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://organizaplusapp.com.br'
 
 export async function POST(req: NextRequest) {
   const key = process.env.STRIPE_SECRET_KEY

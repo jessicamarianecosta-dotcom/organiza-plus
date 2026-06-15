@@ -459,9 +459,9 @@ export default function Onboarding() {
               <div style={{ display:'flex', alignItems:'center', gap:10, background:th.glow, borderRadius:T.r12, padding:'11px 14px' }}>
                 <Globe size={15} style={{ color:th.primary, flexShrink:0 }}/>
                 <span style={{ fontSize:13, fontWeight:600, color:T.dark, flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                  organiza-plus-five.vercel.app/p/{slug}
+                  organizaplusapp.com.br/p/{slug}
                 </span>
-                <button type="button" onClick={()=>navigator.clipboard.writeText(`https://organiza-plus-five.vercel.app/p/${slug}`)}
+                <button type="button" onClick={()=>navigator.clipboard.writeText(`https://organizaplusapp.com.br/p/${slug}`)}
                   style={{ background:th.primary, color:T.cream, border:'none', borderRadius:T.r10, padding:'5px 12px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:T.fontSans, flexShrink:0 }}>
                   Copiar
                 </button>
@@ -538,8 +538,8 @@ export default function Onboarding() {
             <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:'18px', marginBottom:20, textAlign:'left' }}>
               <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:12 }}>Próximos passos</p>
               {[
-                { icon:'📱', label:'Copie o link e cole no Instagram', action:()=>navigator.clipboard.writeText(`https://organiza-plus-five.vercel.app/p/${slug}`) },
-                { icon:'💬', label:'Envie para pacientes via WhatsApp', action:()=>window.open(`https://wa.me/?text=${encodeURIComponent(`Agora você pode agendar comigo online! https://organiza-plus-five.vercel.app/p/${slug}`)}`) },
+                { icon:'📱', label:'Copie o link e cole no Instagram', action:()=>navigator.clipboard.writeText(`https://organizaplusapp.com.br/p/${slug}`) },
+                { icon:'💬', label:'Envie para pacientes via WhatsApp', action:()=>window.open(`https://wa.me/?text=${encodeURIComponent(`Agora você pode agendar comigo online! https://organizaplusapp.com.br/p/${slug}`)}`) },
                 { icon:'📊', label:'Explore o painel de gestão', action:()=>router.push('/dashboard') },
               ].map((item,i) => (
                 <button key={i} type="button" onClick={item.action}

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const KEY  = process.env.RESEND_API_KEY
-// Without a verified domain, Resend only allows sending from onboarding@resend.dev
+// Without a verified domain, Resend only allows sending from noreply@organizaplusapp.com.br
 // After adding a custom domain, change to: noreply@organizamais.com.br
-const FROM = 'Organiza+ <onboarding@resend.dev>'
+const FROM = 'Organiza+ <noreply@organizaplusapp.com.br>'
 
 async function send(to: string, subject: string, html: string) {
   if (!KEY) {
@@ -106,7 +106,7 @@ const templates = {
         <p style="margin:0 0 7px;color:#2C3530;font-size:14px">🕐 Configure seus horários</p>
         <p style="margin:0;color:#2C3530;font-size:14px">🔗 Compartilhe seu link único</p>
       </div>
-      <a href="https://organiza-plus-five.vercel.app/onboarding"
+      <a href="https://organizaplusapp.com.br/onboarding"
         style="display:inline-block;margin-top:16px;background:#2C3530;color:#FAFAF7;padding:13px 28px;border-radius:12px;font-size:14px;font-weight:700;text-decoration:none">
         Completar meu perfil →
       </a>

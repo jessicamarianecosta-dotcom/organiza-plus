@@ -515,7 +515,7 @@ function ProfileTab({ profile, onSave }: { profile: Profile|null, onSave:()=>voi
         <div style={{ marginTop:16, background:T.sageG, border:`1px solid ${T.sageP}`, borderRadius:T.r16, padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
           <div>
             <p style={{ fontWeight:600, color:T.sage, fontSize:14, margin:0 }}>Sua página pública</p>
-            <p style={{ fontSize:12, color:T.mid, margin:0 }}>organiza-plus-five.vercel.app/p/{profile.slug}</p>
+            <p style={{ fontSize:12, color:T.mid, margin:0 }}>organizaplusapp.com.br/p/{profile.slug}</p>
           </div>
           <Link href={`/p/${profile.slug}`} target="_blank" style={{ display:'flex', alignItems:'center', gap:5, color:T.sage, fontSize:13, fontWeight:600, textDecoration:'none' }}>
             Ver <ExternalLink size={13}/>
