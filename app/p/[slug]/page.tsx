@@ -165,6 +165,8 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
         fetch('/api/email', { method:'POST', headers:{'Content-Type':'application/json'},
           body:JSON.stringify({ type:'confirmation', to:clientEmail, client:clientName, professional:profile.name, date:selDate, time:selTime }) })
       }
+      // Notify professional by email (stored in auth, fetched server-side via whatsapp route)
+      // Notification already goes via WhatsApp — email is bonus if configured
       setStep('done')
     }
     setSub(false)
