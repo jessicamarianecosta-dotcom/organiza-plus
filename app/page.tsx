@@ -154,7 +154,7 @@ export default function Home() {
               <div key={i} style={{ width:32, height:32, borderRadius:'50%', border:`2px solid ${T.cream}`, background:T.sageP, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, marginLeft:i===0?0:-9 }}>{e}</div>
             ))}
           </div>
-          <span style={{ fontSize: isMobile ? 12 : 13 }}>+1.200 profissionais já usam o Organiza+</span>
+          <span style={{ fontSize: isMobile ? 12 : 13 }}>Feito para psicólogos, nutricionistas, dentistas e outros profissionais de saúde</span>
         </div>
 
         {/* Dashboard mockup */}
@@ -350,20 +350,20 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ══════════════════════════ DEPOIMENTOS ══════════════════════════ */}
+      {/* ══════════════════════════ POR QUE ORGANIZA+ ══════════════════════════ */}
       <section style={{ padding: isMobile ? '64px 20px' : '96px 24px', background:T.cream }}>
         <div style={{ maxWidth:1080, margin:'0 auto' }}>
-          <SectionChip label="💬 Depoimentos"/>
+          <SectionChip label="✦ Por que escolher"/>
           <h2 style={{ fontFamily:T.fontSerif, fontSize: isMobile ? 28 : 'clamp(28px,4vw,44px)', color:T.dark, marginBottom: isMobile ? 32 : 52, lineHeight:1.12 }}>
-            Quem usa, <em style={{ color:T.sage, fontStyle:'italic' }}>ama.</em>
+            Construído para <em style={{ color:T.sage, fontStyle:'italic' }}>profissionais de verdade.</em>
           </h2>
           <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap:18 }}>
             {[
-              { e:'🧠', n:'Dra. Camila R.', r:'Psicóloga · São Paulo',    t:'Reduzi em 90% o tempo respondendo mensagens. Meus clientes adoram a praticidade!' },
-              { e:'🥗', n:'Fernanda M.',    r:'Nutricionista · Curitiba',  t:'Finalmente tenho uma página profissional linda sem pagar caro por um site.' },
-              { e:'💆', n:'Rafael S.',      r:'Fisioterapeuta · BH',       t:'Recebi o aviso no WhatsApp na hora. Nunca mais perdi uma consulta.' },
+              { e:'🎨', t:'Identidade só sua', d:'Página com copy e visual pensados para a sua profissão — não um perfil genérico dentro de um marketplace.' },
+              { e:'⚡', t:'No ar em minutos', d:'Cadastre-se, configure horários e compartilhe seu link. Sem precisar contratar ninguém para criar um site.' },
+              { e:'💬', t:'Aviso instantâneo', d:'Toda vez que alguém agenda, você recebe a notificação no WhatsApp com os dados do cliente.' },
             ].map(t=>(
-              <TestCard key={t.n} {...t}/>
+              <BenefitCard key={t.t} {...t}/>
             ))}
           </div>
         </div>
@@ -387,7 +387,11 @@ export default function Home() {
       {/* ══════════════════════════ FOOTER ══════════════════════════ */}
       <footer style={{ background:T.dark, borderTop:'1px solid rgba(255,255,255,0.06)', padding: isMobile ? '28px 20px' : '36px 24px', textAlign:'center' }}>
         <p style={{ fontFamily:T.fontSerif, fontSize:17, color:'rgba(255,255,255,0.18)', marginBottom:6 }}>Organiza<span style={{ color:'rgba(122,158,135,0.45)' }}>+</span></p>
-        <p style={{ fontSize:12, color:'rgba(255,255,255,0.18)', margin:0 }}>© 2025 Organiza+. Feito com 💚 para profissionais modernos.</p>
+        <p style={{ fontSize:12, color:'rgba(255,255,255,0.18)', margin:'0 0 12px' }}>© 2026 Organiza+. Feito com 💚 para profissionais modernos.</p>
+        <div style={{ display:'flex', gap:16, justifyContent:'center' }}>
+          <Link href="/termos" style={{ fontSize:12, color:'rgba(255,255,255,0.3)', textDecoration:'none' }}>Termos de Uso</Link>
+          <Link href="/privacidade" style={{ fontSize:12, color:'rgba(255,255,255,0.3)', textDecoration:'none' }}>Privacidade</Link>
+        </div>
       </footer>
     </div>
   )
@@ -491,20 +495,14 @@ function PlanCard({ name, price, features, cta, href, featured, badge }: { name:
   )
 }
 
-function TestCard({ e, n, r, t }: { e:string, n:string, r:string, t:string }) {
+function BenefitCard({ e, t, d }: { e:string, t:string, d:string }) {
   const [h,setH] = useState(false)
   return (
     <div onMouseEnter={()=>setH(true)} onMouseLeave={()=>setH(false)}
       style={{ background:T.white, borderRadius:T.r20, padding:'26px', border:`1px solid ${T.nude}`, boxShadow:h?T.shadowMd:T.shadowCard, transition:'transform 0.2s, box-shadow 0.2s', transform:h?'translateY(-3px)':'none' }}>
-      <div style={{ color:'#f5c842', fontSize:15, marginBottom:12, letterSpacing:2 }}>★★★★★</div>
-      <p style={{ fontSize:15, color:T.mid, lineHeight:1.7, fontStyle:'italic', marginBottom:20 }}>"{t}"</p>
-      <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-        <div style={{ width:40, height:40, borderRadius:'50%', background:T.sageG, display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>{e}</div>
-        <div>
-          <p style={{ fontWeight:700, fontSize:14, color:T.dark, margin:0 }}>{n}</p>
-          <p style={{ fontSize:12, color:T.muted, margin:0 }}>{r}</p>
-        </div>
-      </div>
+      <div style={{ width:44, height:44, borderRadius:T.r12, background:T.sageG, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, marginBottom:18 }}>{e}</div>
+      <h3 style={{ fontWeight:700, fontSize:16, color:T.dark, marginBottom:8 }}>{t}</h3>
+      <p style={{ fontSize:14, color:T.mid, lineHeight:1.65, margin:0 }}>{d}</p>
     </div>
   )
 }

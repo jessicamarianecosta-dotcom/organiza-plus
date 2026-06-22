@@ -44,6 +44,7 @@ function CadastroForm() {
   const [password, setPassword] = useState('')
   const [profession,   setProfession]   = useState('')
   const [customProf,   setCustomProf]   = useState('')
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
 
   const [nameErr,  setNameErr]  = useState('')
   const [emailErr, setEmailErr] = useState('')
@@ -234,16 +235,28 @@ function CadastroForm() {
                   placeholder="Ex: Biomédico, Advogado, Fonoaudiólogo..." autoFocus/>
               )}
 
+              <label style={{ display:'flex', alignItems:'flex-start', gap:9, marginBottom:18, marginTop:6, cursor:'pointer' }}>
+                <input type="checkbox" checked={acceptedTerms} onChange={e=>setAcceptedTerms(e.target.checked)}
+                  style={{ marginTop:2, width:16, height:16, accentColor:T.sage, cursor:'pointer', flexShrink:0 }}/>
+                <span style={{ fontSize:12.5, color:T.muted, lineHeight:1.5 }}>
+                  Li e aceito os{' '}
+                  <a href="/termos" target="_blank" style={{ color:T.sage, fontWeight:600, textDecoration:'underline' }}>Termos de Uso</a>
+                  {' '}e a{' '}
+                  <a href="/privacidade" target="_blank" style={{ color:T.sage, fontWeight:600, textDecoration:'underline' }}>Política de Privacidade</a>
+                  {' '}do Organiza+.
+                </span>
+              </label>
+
               <div style={{ display:'flex', gap:10, marginTop:4 }}>
                 <button type="button" onClick={()=>{setStep(1);setError('')}}
                   style={{ padding:'14px 20px', border:`2px solid ${T.nude}`, background:'transparent', color:T.dark, borderRadius:T.r12, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:T.fontSans, flexShrink:0, transition:'border-color 0.15s' }}
                   onMouseEnter={e=>e.currentTarget.style.borderColor=T.sage} onMouseLeave={e=>e.currentTarget.style.borderColor=T.nude}>
                   ←
                 </button>
-                <button type="submit" disabled={loading||!profession||(profession==='Outro'&&!customProf.trim())}
-                  style={{ flex:1, padding:'14px', fontSize:15, fontWeight:700, color:T.cream, background:T.dark, border:'none', borderRadius:T.r12, cursor:(loading||!profession||(profession==='Outro'&&!customProf.trim()))?'not-allowed':'pointer', fontFamily:T.fontSans, transition:'background 0.2s', opacity:(loading||!profession||(profession==='Outro'&&!customProf.trim()))?0.45:1, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}
-                  onMouseEnter={e=>{ if(!loading&&profession) e.currentTarget.style.background=T.sage }}
-                  onMouseLeave={e=>{ if(!loading&&profession) e.currentTarget.style.background=T.dark }}>
+                <button type="submit" disabled={loading||!profession||(profession==='Outro'&&!customProf.trim())||!acceptedTerms}
+                  style={{ flex:1, padding:'14px', fontSize:15, fontWeight:700, color:T.cream, background:T.dark, border:'none', borderRadius:T.r12, cursor:(loading||!profession||(profession==='Outro'&&!customProf.trim())||!acceptedTerms)?'not-allowed':'pointer', fontFamily:T.fontSans, transition:'background 0.2s', opacity:(loading||!profession||(profession==='Outro'&&!customProf.trim())||!acceptedTerms)?0.45:1, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}
+                  onMouseEnter={e=>{ if(!loading&&profession&&acceptedTerms) e.currentTarget.style.background=T.sage }}
+                  onMouseLeave={e=>{ if(!loading&&profession&&acceptedTerms) e.currentTarget.style.background=T.dark }}>
                   {loading && <span style={{ width:16, height:16, border:`2px solid ${T.cream}`, borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.7s linear infinite', display:'inline-block', flexShrink:0 }}/>}
                   {loading ? 'Criando conta...' : 'Criar minha conta →'}
                 </button>

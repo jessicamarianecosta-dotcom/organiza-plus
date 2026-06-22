@@ -438,9 +438,20 @@ export default function Onboarding() {
               />
             </div>
 
+            {Object.values(weekConfig).filter(d=>d.enabled).length === 0 && (
+              <div style={{ background:T.redL, border:`1px solid ${T.redB}`, borderRadius:T.r14, padding:'13px 16px', marginBottom:16, display:'flex', gap:10, alignItems:'flex-start' }}>
+                <span style={{ fontWeight:700, color:T.red, flexShrink:0 }}>⚠</span>
+                <p style={{ fontSize:13, color:T.red, margin:0 }}>Ative pelo menos um dia da semana para que clientes possam agendar com você.</p>
+              </div>
+            )}
+
             <div style={{ display:'flex', gap:10 }}>
               <SecBtn onClick={()=>setStep(3)}>← Voltar</SecBtn>
-              <div style={{ flex:1 }}><PrimaryBtn onClick={saveStep4} loading={saving}>Continuar <ChevronRight size={18}/></PrimaryBtn></div>
+              <div style={{ flex:1 }}>
+                <PrimaryBtn onClick={saveStep4} loading={saving} disabled={Object.values(weekConfig).filter(d=>d.enabled).length === 0}>
+                  Continuar <ChevronRight size={18}/>
+                </PrimaryBtn>
+              </div>
             </div>
           </div>
         )}
