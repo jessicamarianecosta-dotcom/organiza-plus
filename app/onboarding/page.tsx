@@ -128,33 +128,35 @@ export default function Onboarding() {
 
   useEffect(() => {
     setMounted(true)
-    supabase.auth.getUser()
-      .then(({ data: { user } }) => {
-        if (!user) { router.push('/login'); return }
-        supabase.from('profiles').select('*').eq('id', user.id).single()
-          .then(({ data: p }) => {
-            if (!p) { router.push('/cadastro'); return }
-            if ((p as any).onboarding_done) { router.push('/dashboard'); return }
-            setPid(p.id); setSlug((p as any).slug || '')
-            setName(p.name || ''); setBio(p.bio || '')
-            setWhatsapp(p.whatsapp || ''); setCity(p.city || '')
-            setState(p.state || ''); setCrm(p.crm_cro_crp || '')
-            setInstagram((p as any).instagram || ''); setPhotoUrl(p.photo_url || '')
-            setProfession(p.profession || ''); setSpecs(p.specialties || [])
-            const saved = THEMES.find(t => t.id === (p as any).theme_color)
-            if (saved) setTheme(saved)
-          })
-          .catch(() => router.push('/login'))
-      })
-      .catch(() => router.push('/login'))
+    ;(async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { void router.push('/login'); return }
+        const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+        if (!p) { void router.push('/cadastro'); return }
+        if ((p as any).onboarding_done) { void router.push('/dashboard'); return }
+        setPid(p.id); setSlug((p as any).slug || '')
+        setName(p.name || ''); setBio(p.bio || '')
+        setWhatsapp(p.whatsapp || ''); setCity(p.city || '')
+        setState(p.state || ''); setCrm(p.crm_cro_crp || '')
+        setInstagram((p as any).instagram || ''); setPhotoUrl(p.photo_url || '')
+        setProfession(p.profession || ''); setSpecs(p.specialties || [])
+        const saved = THEMES.find(t => t.id === (p as any).theme_color)
+        if (saved) setTheme(saved)
+      } catch (_e) {
+        void router.push('/login')
+      }
+    })()
   }, [router])
 
 
   async function uploadPhoto(file: File): Promise<string> {
     const fd = new FormData(); fd.append('file', file)
     const res = await fetch('/api/upload', { method:'POST', body:fd })
-    const { url } = await res.json()
-    return url || ''
+    const data = await res.json()
+    if (!res.ok || data.error) throw new Error(data.error || `Erro ${res.status}`)
+    if (!data.url) throw new Error('URL da foto não retornada.')
+    return data.url
   }
 
   async function saveStep1() {

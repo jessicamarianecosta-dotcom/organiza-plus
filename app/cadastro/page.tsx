@@ -52,17 +52,16 @@ function CadastroForm() {
 
   useEffect(() => {
     setMounted(true)
-    supabase.auth.getUser()
-      .then(({ data: { user } }) => {
-        if (user) {
-          supabase.from('profiles').select('onboarding_done').eq('id', user.id).single()
-            .then(({ data: p }) => router.push(p?.onboarding_done ? '/dashboard' : '/onboarding'))
-            .catch(() => setChecking(false))
-        } else {
-          setChecking(false)
-        }
-      })
-      .catch(() => setChecking(false))
+    ;(async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { setChecking(false); return }
+        const { data: p } = await supabase.from('profiles').select('onboarding_done').eq('id', user.id).single()
+        void router.push(p?.onboarding_done ? '/dashboard' : '/onboarding')
+      } catch (_e) {
+        setChecking(false)
+      }
+    })()
   }, [router])
 
   function validateStep1() {
