@@ -33,14 +33,15 @@ export default function Login() {
 
   useEffect(() => {
     setMounted(true)
-    // If already logged in, redirect immediately
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        redirectAfterAuth(user.id, router)
-      } else {
-        setChecking(false)
-      }
-    })
+    supabase.auth.getUser()
+      .then(({ data: { user } }) => {
+        if (user) {
+          redirectAfterAuth(user.id, router)
+        } else {
+          setChecking(false)
+        }
+      })
+      .catch(() => setChecking(false))
   }, [router])
 
   async function handleLogin(e: React.FormEvent) {
