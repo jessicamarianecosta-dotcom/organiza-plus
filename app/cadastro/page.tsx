@@ -83,51 +83,74 @@ function CadastroForm() {
     if (!finalProf) { setError('Selecione ou informe sua profissão.'); return }
     setError(''); setLoading(true)
 
+    const payload = {
+      email: email.trim(),
+      password,
+      name: name.trim(),
+      profession: finalProf,
+      plan: plano,
+    }
+    console.log('[Cadastro] Payload enviado:', { ...payload, password: '***' })
+    console.log('[Cadastro] URL da Edge Function:', `${SUPABASE_URL}/functions/v1/signup`)
+
     try {
-      // Call our Edge Function which uses service_role to bypass email confirmation
       const res = await fetch(`${SUPABASE_URL}/functions/v1/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: email.trim(),
-          password,
-          name: name.trim(),
-          profession: finalProf,
-          plan: plano,
-        }),
+        body: JSON.stringify(payload),
       })
 
-      const data = await res.json()
+      console.log('[Cadastro] HTTP status:', res.status, res.statusText)
+
+      let data: any = {}
+      try {
+        data = await res.json()
+        console.log('[Cadastro] Resposta da Edge Function:', data)
+      } catch (jsonErr) {
+        console.error('[Cadastro] Falha ao parsear resposta JSON:', jsonErr)
+        setError(`Resposta inválida do servidor (status ${res.status}).`)
+        setLoading(false)
+        return
+      }
 
       if (!res.ok || data.error) {
-        const msg = data.error || 'Erro ao criar conta.'
+        const msg = data.error || `Erro HTTP ${res.status}`
+        console.error('[Cadastro] Erro da Edge Function:', msg)
         if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('already been registered')) {
           setError('Este e-mail já está cadastrado. Faça login ou recupere sua senha.')
-        } else if (msg.includes('Password') || msg.includes('password')) {
+        } else if (msg.toLowerCase().includes('password')) {
           setError('Senha muito fraca. Use ao menos 6 caracteres.')
-        } else if (msg.includes('valid email') || msg.includes('invalid email')) {
+        } else if (msg.toLowerCase().includes('valid email') || msg.toLowerCase().includes('invalid email')) {
           setError('E-mail inválido. Verifique e tente novamente.')
         } else {
-          setError('Erro ao criar conta. Verifique os dados e tente novamente.')
-          console.error('Signup edge function error:', msg)
+          setError(`Erro: ${msg}`)
         }
         setLoading(false)
         return
       }
 
-      // Set session from Edge Function response
+      console.log('[Cadastro] Conta criada. Configurando sessão...')
+
       if (data.session) {
-        await supabase.auth.setSession({
+        const { error: sessionErr } = await supabase.auth.setSession({
           access_token:  data.session.access_token,
           refresh_token: data.session.refresh_token,
         })
+        if (sessionErr) {
+          console.error('[Cadastro] Erro ao configurar sessão:', sessionErr)
+          setError(`Conta criada mas falha ao iniciar sessão: ${sessionErr.message}`)
+          setLoading(false)
+          return
+        }
       }
 
+      console.log('[Cadastro] Sucesso! Redirecionando para /onboarding')
       router.push('/onboarding')
 
     } catch (err: any) {
-      console.error('Network/unexpected error:', err)
-      setError('Erro de conexão. Verifique sua internet e tente novamente.')
+      console.error('[Cadastro] Erro de rede/inesperado:', err)
+      const detail = err?.message || String(err)
+      setError(`Erro de conexão: ${detail}`)
       setLoading(false)
     }
   }

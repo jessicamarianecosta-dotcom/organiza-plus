@@ -3,8 +3,8 @@
   "outputDirectory": ".next",
   "framework": "nextjs",
   "env": {
-    "NEXT_PUBLIC_SUPABASE_URL": "https://fqxwmvcxxhtgbxsuqaty.supabase.co",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxeHdtdmN4eGh0Z2J4c3VxYXR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNTU0OTUsImV4cCI6MjA5NjkzMTQ5NX0.ernj45yDTYkJ7p8riod7rLQZfjiviYn40TkEOClZNm8",
+    "NEXT_PUBLIC_SUPABASE_URL": "https://efubgpauyzhggtmmphnu.supabase.co",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmdWJncGF1eXpoZ2d0bW1waG51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwOTUzODcsImV4cCI6MjA5NzY3MTM4N30.zSeEUswgM-xPK0XACx_-O_qeG2Z2NnD7Lo5ncoTXjO8",
     "NEXT_PUBLIC_APP_URL": "https://organiza-plus-five.vercel.app"
   }
 }
