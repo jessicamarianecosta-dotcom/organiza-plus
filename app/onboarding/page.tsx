@@ -153,8 +153,10 @@ export default function Onboarding() {
   async function uploadPhoto(file: File): Promise<string> {
     const fd = new FormData(); fd.append('file', file)
     const res = await fetch('/api/upload', { method:'POST', body:fd })
-    const { url } = await res.json()
-    return url || ''
+    const data = await res.json()
+    if (!res.ok || data.error) throw new Error(data.error || `Erro ${res.status}`)
+    if (!data.url) throw new Error('URL da foto não retornada.')
+    return data.url
   }
 
   async function saveStep1() {

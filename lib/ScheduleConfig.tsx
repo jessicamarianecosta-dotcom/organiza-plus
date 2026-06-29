@@ -1,24 +1,24 @@
 'use client'
 import { useState, useCallback } from 'react'
 import { T } from '@/lib/ds'
-import { Clock, Coffee, Repeat, Zap, Plus, X, ChevronDown, ChevronUp, Copy } from 'lucide-react'
+import { Zap, Plus, X, ChevronDown, Copy } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────
 export type DayConfig = {
-  enabled:     boolean
-  start:       string
-  end:         string
-  lunchStart:  string | null
-  lunchEnd:    string | null
+  enabled:      boolean
+  start:        string
+  end:          string
+  lunchStart:   string | null
+  lunchEnd:     string | null
   apptDuration: number
-  breakMins:   number
+  breakMins:    number
 }
 
 export type WeekConfig = Record<number, DayConfig>  // 0=Sun … 6=Sat
 
 export type BlockedSlot = {
   id?:        string
-  date:       string       // YYYY-MM-DD
+  date:       string
   allDay:     boolean
   startTime?: string
   endTime?:   string
@@ -26,7 +26,7 @@ export type BlockedSlot = {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
-const DAYS_FULL = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
+const DAYS_FULL  = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
 const DAYS_SHORT = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
 
 const DURATION_OPTIONS = [15,20,25,30,40,45,50,60,75,90,120]
@@ -38,13 +38,11 @@ function defaultDay(): DayConfig {
 
 export function defaultWeek(): WeekConfig {
   const w: WeekConfig = {}
-  for (let i=0;i<7;i++) w[i] = defaultDay()
-  // Mon-Fri enabled by default
+  for (let i=0; i<7; i++) w[i] = defaultDay()
   ;[1,2,3,4,5].forEach(d => { w[d].enabled = true })
   return w
 }
 
-/** Generate preview slots for a day, excluding lunch */
 function previewSlots(cfg: DayConfig): string[] {
   if (!cfg.enabled) return []
   const slots: string[] = []
@@ -59,7 +57,6 @@ function previewSlots(cfg: DayConfig): string[] {
     const endM = (m + cfg.apptDuration) % 60
     if (endH > eh || (endH === eh && endM > em)) break
     const slot = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`
-    // Skip if overlaps lunch
     const isLunch = lunchS && lunchE && (
       (h*60+m) < (lunchE[0]*60+lunchE[1]) && (endH*60+endM) > (lunchS[0]*60+lunchS[1])
     )
@@ -71,12 +68,12 @@ function previewSlots(cfg: DayConfig): string[] {
 
 // ─── Sub-components ────────────────────────────────────────────────────────
 function TI({ value, set, label, disabled }: { value:string, set:(v:string)=>void, label?:string, disabled?:boolean }) {
-  const [f,setF] = useState(false)
+  const [f, setF] = useState(false)
   return (
     <div>
       {label && <label style={{ display:'block', fontSize:11, fontWeight:600, color:T.muted, marginBottom:4, textTransform:'uppercase', letterSpacing:'0.05em' }}>{label}</label>}
       <input type="time" value={value} onChange={e=>set(e.target.value)} disabled={disabled}
-        style={{ padding:'9px 12px', fontSize:13, color:T.dark, background:disabled?T.nude:T.white, border:`1.5px solid ${f?T.sage:T.nude}`, borderRadius:T.r10, outline:'none', fontFamily:T.fontSans, width:'100%', cursor:disabled?'not-allowed':'text' }}
+        style={{ padding:'9px 10px', fontSize:14, color:T.dark, background:disabled?T.nude:T.white, border:`1.5px solid ${f?T.sage:T.nude}`, borderRadius:T.r10, outline:'none', fontFamily:T.fontSans, width:'100%', boxSizing:'border-box', cursor:disabled?'not-allowed':'text' }}
         onFocus={()=>setF(true)} onBlur={()=>setF(false)}/>
     </div>
   )
@@ -87,7 +84,7 @@ function Select({ value, set, options, label }: { value:number, set:(v:number)=>
     <div>
       {label && <label style={{ display:'block', fontSize:11, fontWeight:600, color:T.muted, marginBottom:4, textTransform:'uppercase', letterSpacing:'0.05em' }}>{label}</label>}
       <select value={value} onChange={e=>set(Number(e.target.value))}
-        style={{ padding:'9px 12px', fontSize:13, color:T.dark, background:T.white, border:`1.5px solid ${T.nude}`, borderRadius:T.r10, outline:'none', fontFamily:T.fontSans, width:'100%', cursor:'pointer', appearance:'none' }}>
+        style={{ padding:'9px 10px', fontSize:13, color:T.dark, background:T.white, border:`1.5px solid ${T.nude}`, borderRadius:T.r10, outline:'none', fontFamily:T.fontSans, width:'100%', boxSizing:'border-box', cursor:'pointer', appearance:'none' }}>
         {options.map(o=><option key={o} value={o}>{o} min</option>)}
       </select>
     </div>
@@ -96,44 +93,35 @@ function Select({ value, set, options, label }: { value:number, set:(v:number)=>
 
 // ─── DayCard ──────────────────────────────────────────────────────────────
 function DayCard({ dayIdx, cfg, onChange, theme, onCopyToAll }: {
-  dayIdx: number
-  cfg: DayConfig
-  onChange: (c: DayConfig) => void
-  theme: { primary:string; glow:string; pale:string }
-  onCopyToAll: (cfg: DayConfig) => void
+  dayIdx:     number
+  cfg:        DayConfig
+  onChange:   (c: DayConfig) => void
+  theme:      { primary:string; glow:string; pale:string }
+  onCopyToAll:(cfg: DayConfig) => void
 }) {
-  const [expanded, setExpanded] = useState(false)
-  const [showLunch, setShowLunch] = useState(!!cfg.lunchStart)
+  const [expanded,    setExpanded]    = useState(false)
   const [showPreview, setShowPreview] = useState(false)
 
   const up = useCallback(<K extends keyof DayConfig>(k:K, v:DayConfig[K]) => {
     onChange({ ...cfg, [k]: v })
   }, [cfg, onChange])
 
-  const toggleLunch = () => {
-    if (showLunch) {
-      onChange({ ...cfg, lunchStart:null, lunchEnd:null })
-      setShowLunch(false)
-    } else {
-      onChange({ ...cfg, lunchStart:'12:00', lunchEnd:'13:00' })
-      setShowLunch(true)
-    }
-  }
-
   const slots = previewSlots(cfg)
 
   return (
-    <div style={{
-      borderRadius: T.r16, border: `2px solid ${cfg.enabled ? theme.pale : T.nude}`,
-      background: cfg.enabled ? theme.glow : T.off,
-      transition: 'all 0.2s ease', overflow:'hidden',
+    <div className="sch-card" style={{
+      borderRadius: T.r16,
+      border:       `2px solid ${cfg.enabled ? theme.pale : T.nude}`,
+      background:   cfg.enabled ? theme.glow : T.off,
+      transition:   'all 0.2s ease',
+      overflow:     'hidden',
     }}>
-      {/* Header row */}
-      <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', cursor:'pointer' }}
-        onClick={()=>{ if(cfg.enabled) setExpanded(!expanded) }}>
-        {/* Toggle checkbox */}
+      {/* Header */}
+      <div style={{ display:'flex', alignItems:'center', gap:10, padding:'13px 14px', cursor:'pointer' }}
+        onClick={() => { if (cfg.enabled) setExpanded(!expanded) }}>
+
         <button type="button"
-          onClick={e=>{ e.stopPropagation(); up('enabled',!cfg.enabled); if(!cfg.enabled) setExpanded(true) }}
+          onClick={e => { e.stopPropagation(); up('enabled', !cfg.enabled); if (!cfg.enabled) setExpanded(true) }}
           style={{ width:22, height:22, borderRadius:6, border:`2px solid ${cfg.enabled?theme.primary:T.nude}`, background:cfg.enabled?theme.primary:T.white, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0, transition:'all 0.15s' }}>
           {cfg.enabled && <span style={{ color:'#fff', fontSize:11, fontWeight:800 }}>✓</span>}
         </button>
@@ -143,16 +131,16 @@ function DayCard({ dayIdx, cfg, onChange, theme, onCopyToAll }: {
         </span>
 
         {cfg.enabled && (
-          <span style={{ fontSize:12, color:theme.primary, fontWeight:600 }}>
-            {cfg.start} – {cfg.end}
-            {cfg.lunchStart ? ` · 🍽 ${cfg.lunchStart}–${cfg.lunchEnd}` : ''}
+          <span className="sch-summary" style={{ fontSize:11, color:theme.primary, fontWeight:600, textAlign:'right', lineHeight:1.4 }}>
+            {cfg.start}–{cfg.end}
+            {cfg.lunchStart && cfg.lunchEnd ? <><br/>🍽 {cfg.lunchStart}–{cfg.lunchEnd}</> : ''}
           </span>
         )}
-
-        {!cfg.enabled && <span style={{ fontSize:12, color:T.muted, fontStyle:'italic' }}>Desativado</span>}
-
+        {!cfg.enabled && (
+          <span style={{ fontSize:12, color:T.muted, fontStyle:'italic' }}>Desativado</span>
+        )}
         {cfg.enabled && (
-          <div style={{ color:T.muted, display:'flex', alignItems:'center', transition:'transform 0.2s', transform:expanded?'rotate(180deg)':'none' }}>
+          <div style={{ color:T.muted, display:'flex', alignItems:'center', transition:'transform 0.2s', transform:expanded?'rotate(180deg)':'none', flexShrink:0 }}>
             <ChevronDown size={16}/>
           </div>
         )}
@@ -160,48 +148,48 @@ function DayCard({ dayIdx, cfg, onChange, theme, onCopyToAll }: {
 
       {/* Expanded body */}
       {cfg.enabled && expanded && (
-        <div style={{ padding:'0 16px 16px', animation:'fadeIn 0.2s ease' }}>
+        <div style={{ padding:'0 14px 14px', animation:'fadeIn 0.2s ease' }}>
           <div style={{ height:1, background:theme.pale, marginBottom:14 }}/>
 
-          {/* Time range */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
-            <TI label="Início" value={cfg.start} set={v=>up('start',v)}/>
-            <TI label="Término" value={cfg.end}  set={v=>up('end',v)}/>
+          {/* Work hours */}
+          <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.06em', margin:'0 0 8px' }}>
+            Horário de trabalho
+          </p>
+          <div className="sch-grid-2" style={{ marginBottom:16 }}>
+            <TI label="Entrada" value={cfg.start} set={v=>up('start',v)}/>
+            <TI label="Saída"   value={cfg.end}   set={v=>up('end',v)}/>
           </div>
 
-          {/* Duration + Break */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
-            <Select label="⏱ Duração da consulta" value={cfg.apptDuration} set={v=>up('apptDuration',v)} options={DURATION_OPTIONS}/>
-            <Select label="🔄 Intervalo entre consultas" value={cfg.breakMins} set={v=>up('breakMins',v)} options={BREAK_OPTIONS}/>
+          {/* Lunch break — always visible */}
+          <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.06em', margin:'0 0 8px', display:'flex', alignItems:'center', gap:6 }}>
+            🍽 Intervalo de almoço
+          </p>
+          <div className="sch-grid-2" style={{ marginBottom:16, padding:'12px', background:T.white, borderRadius:T.r12, border:`1px solid ${theme.pale}` }}>
+            <TI label="Início do almoço"   value={cfg.lunchStart||'12:00'} set={v=>up('lunchStart',v)}/>
+            <TI label="Término do almoço"  value={cfg.lunchEnd  ||'13:00'} set={v=>up('lunchEnd',v)}/>
           </div>
 
-          {/* Lunch toggle */}
-          <div style={{ marginBottom:14 }}>
-            <button type="button" onClick={toggleLunch}
-              style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 14px', borderRadius:T.r12, border:`1.5px dashed ${showLunch?theme.primary:T.nude}`, background:showLunch?theme.glow:'transparent', color:showLunch?theme.primary:T.muted, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:T.fontSans, transition:'all 0.15s', width:'100%' }}>
-              <Coffee size={14}/> {showLunch ? 'Remover intervalo de almoço' : '+ Adicionar intervalo de almoço'}
-            </button>
+          {/* Duration + break */}
+          <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.06em', margin:'0 0 8px' }}>
+            Configuração de consultas
+          </p>
+          <div className="sch-grid-2" style={{ marginBottom:14 }}>
+            <Select label="⏱ Duração"         value={cfg.apptDuration} set={v=>up('apptDuration',v)} options={DURATION_OPTIONS}/>
+            <Select label="🔄 Intervalo entre" value={cfg.breakMins}    set={v=>up('breakMins',v)}    options={BREAK_OPTIONS}/>
           </div>
-
-          {showLunch && (
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14, padding:'12px 14px', background:T.white, borderRadius:T.r12, border:`1px solid ${theme.pale}` }}>
-              <TI label="🍽 Início do almoço" value={cfg.lunchStart||'12:00'} set={v=>up('lunchStart',v)}/>
-              <TI label="Término do almoço"  value={cfg.lunchEnd  ||'13:00'} set={v=>up('lunchEnd',v)}/>
-            </div>
-          )}
 
           {/* Slot preview */}
-          <div style={{ marginBottom:14 }}>
+          <div style={{ marginBottom:12 }}>
             <button type="button" onClick={()=>setShowPreview(!showPreview)}
               style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, fontWeight:700, color:theme.primary, background:'none', border:'none', cursor:'pointer', fontFamily:T.fontSans }}>
               <Zap size={12}/> {showPreview?'Ocultar':'Ver'} horários gerados ({slots.length} slots)
             </button>
             {showPreview && (
-              <div style={{ marginTop:10, display:'flex', flexWrap:'wrap', gap:6 }}>
+              <div style={{ marginTop:8, display:'flex', flexWrap:'wrap', gap:5 }}>
                 {slots.map(s=>(
-                  <span key={s} style={{ fontSize:11, fontWeight:600, padding:'4px 10px', borderRadius:T.r100, background:T.white, border:`1px solid ${theme.pale}`, color:theme.primary }}>{s}</span>
+                  <span key={s} style={{ fontSize:11, fontWeight:600, padding:'3px 9px', borderRadius:T.r100, background:T.white, border:`1px solid ${theme.pale}`, color:theme.primary }}>{s}</span>
                 ))}
-                {slots.length===0 && <span style={{ fontSize:12, color:T.red }}>⚠ Nenhum horário gerado com essa configuração.</span>}
+                {slots.length===0 && <span style={{ fontSize:12, color:T.red }}>⚠ Nenhum horário com essa configuração.</span>}
               </div>
             )}
           </div>
@@ -219,17 +207,17 @@ function DayCard({ dayIdx, cfg, onChange, theme, onCopyToAll }: {
   )
 }
 
-// ─── BlockedSlots section ──────────────────────────────────────────────────
+// ─── BlockedSlots ──────────────────────────────────────────────────────────
 function BlockedSlotsSection({ blocked, onChange, theme }: {
-  blocked: BlockedSlot[]
+  blocked:  BlockedSlot[]
   onChange: (b: BlockedSlot[]) => void
-  theme: { primary:string; glow:string; pale:string }
+  theme:    { primary:string; glow:string; pale:string }
 }) {
-  const [date,    setDate]    = useState('')
-  const [reason,  setReason]  = useState('')
-  const [allDay,  setAllDay]  = useState(true)
-  const [start,   setStart]   = useState('09:00')
-  const [end,     setEnd]     = useState('10:00')
+  const [date,   setDate]   = useState('')
+  const [reason, setReason] = useState('')
+  const [allDay, setAllDay] = useState(true)
+  const [start,  setStart]  = useState('09:00')
+  const [end,    setEnd]    = useState('10:00')
   const [fi, setFi] = useState(false)
   const [fr, setFr] = useState(false)
 
@@ -244,32 +232,31 @@ function BlockedSlotsSection({ blocked, onChange, theme }: {
       <div style={{ padding:'14px 16px', borderBottom:`1px solid ${T.nude}`, display:'flex', alignItems:'center', gap:8 }}>
         <span style={{ fontSize:20 }}>🚫</span>
         <div>
-          <p style={{ fontWeight:700, fontSize:14, color:T.dark, margin:0 }}>Bloquear datas e horários</p>
-          <p style={{ fontSize:12, color:T.muted, margin:0 }}>Feriados, reuniões, férias ou pausas específicas</p>
+          <p style={{ fontWeight:700, fontSize:14, color:T.dark, margin:0 }}>Bloquear datas</p>
+          <p style={{ fontSize:12, color:T.muted, margin:0 }}>Feriados, férias ou pausas específicas</p>
         </div>
       </div>
-      <div style={{ padding:'16px' }}>
-        {/* Add form */}
-        <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:10, marginBottom:12 }}>
+      <div style={{ padding:'14px' }}>
+        <div className="sch-grid-2" style={{ marginBottom:10 }}>
           <input type="date" value={date} onChange={e=>setDate(e.target.value)}
-            style={{ padding:'9px 12px', fontSize:13, color:T.dark, background:T.off, border:`1.5px solid ${fi?T.sage:T.nude}`, borderRadius:T.r10, outline:'none', fontFamily:T.fontSans }}
+            style={{ padding:'9px 10px', fontSize:13, color:T.dark, background:T.off, border:`1.5px solid ${fi?T.sage:T.nude}`, borderRadius:T.r10, outline:'none', fontFamily:T.fontSans, width:'100%', boxSizing:'border-box' }}
             onFocus={()=>setFi(true)} onBlur={()=>setFi(false)}/>
           <button type="button" onClick={()=>setAllDay(!allDay)}
-            style={{ padding:'9px 14px', borderRadius:T.r10, border:`1.5px solid ${!allDay?T.sage:T.nude}`, background:!allDay?T.sageG:T.off, color:!allDay?T.sage:T.muted, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:T.fontSans, whiteSpace:'nowrap', transition:'all 0.15s' }}>
+            style={{ padding:'9px 10px', borderRadius:T.r10, border:`1.5px solid ${!allDay?T.sage:T.nude}`, background:!allDay?T.sageG:T.off, color:!allDay?T.sage:T.muted, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:T.fontSans, transition:'all 0.15s', width:'100%', boxSizing:'border-box' }}>
             {allDay ? '🕐 Horário específico' : '📅 Dia inteiro'}
           </button>
         </div>
 
         {!allDay && (
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12 }}>
+          <div className="sch-grid-2" style={{ marginBottom:10 }}>
             <TI label="Das" value={start} set={setStart}/>
             <TI label="Até" value={end}   set={setEnd}/>
           </div>
         )}
 
-        <div style={{ display:'flex', gap:10, marginBottom: blocked.length>0?14:0 }}>
+        <div style={{ display:'flex', gap:8, marginBottom:blocked.length>0?12:0 }}>
           <input value={reason} onChange={e=>setReason(e.target.value)} placeholder="Motivo (opcional)"
-            style={{ flex:1, padding:'9px 12px', fontSize:13, color:T.dark, background:T.off, border:`1.5px solid ${fr?T.sage:T.nude}`, borderRadius:T.r10, outline:'none', fontFamily:T.fontSans }}
+            style={{ flex:1, padding:'9px 10px', fontSize:13, color:T.dark, background:T.off, border:`1.5px solid ${fr?T.sage:T.nude}`, borderRadius:T.r10, outline:'none', fontFamily:T.fontSans, minWidth:0 }}
             onFocus={()=>setFr(true)} onBlur={()=>setFr(false)}
             onKeyDown={e=>e.key==='Enter'&&add()}/>
           <button type="button" onClick={add} disabled={!date}
@@ -278,12 +265,11 @@ function BlockedSlotsSection({ blocked, onChange, theme }: {
           </button>
         </div>
 
-        {/* List */}
         {blocked.length > 0 && (
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
             {blocked.map((b,i) => (
-              <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', background:T.off, borderRadius:T.r12, border:`1px solid ${T.nude}` }}>
-                <span style={{ fontSize:16 }}>{b.allDay?'📅':'🕐'}</span>
+              <div key={i} style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 11px', background:T.off, borderRadius:T.r12, border:`1px solid ${T.nude}` }}>
+                <span style={{ fontSize:16, flexShrink:0 }}>{b.allDay?'📅':'🕐'}</span>
                 <div style={{ flex:1, minWidth:0 }}>
                   <p style={{ fontWeight:600, fontSize:13, color:T.dark, margin:0 }}>
                     {b.date}{!b.allDay?` · ${b.startTime}–${b.endTime}`:''}
@@ -291,8 +277,9 @@ function BlockedSlotsSection({ blocked, onChange, theme }: {
                   {b.reason && <p style={{ fontSize:11, color:T.muted, margin:0 }}>{b.reason}</p>}
                 </div>
                 <button type="button" onClick={()=>onChange(blocked.filter((_,j)=>j!==i))}
-                  style={{ background:'none', border:'none', cursor:'pointer', color:T.muted, display:'flex', transition:'color 0.15s' }}
-                  onMouseEnter={e=>e.currentTarget.style.color=T.red} onMouseLeave={e=>e.currentTarget.style.color=T.muted}>
+                  style={{ background:'none', border:'none', cursor:'pointer', color:T.muted, display:'flex', flexShrink:0, transition:'color 0.15s' }}
+                  onMouseEnter={e=>e.currentTarget.style.color=T.red}
+                  onMouseLeave={e=>e.currentTarget.style.color=T.muted}>
                   <X size={14}/>
                 </button>
               </div>
@@ -304,14 +291,14 @@ function BlockedSlotsSection({ blocked, onChange, theme }: {
   )
 }
 
-// ─── Main ScheduleConfig export ────────────────────────────────────────────
+// ─── Main export ────────────────────────────────────────────────────────────
 interface ScheduleConfigProps {
-  value:   WeekConfig
-  onChange: (w: WeekConfig) => void
-  blocked:  BlockedSlot[]
+  value:           WeekConfig
+  onChange:        (w: WeekConfig) => void
+  blocked:         BlockedSlot[]
   onBlockedChange: (b: BlockedSlot[]) => void
-  theme?: { primary:string; glow:string; pale:string }
-  showBlocked?: boolean
+  theme?:          { primary:string; glow:string; pale:string }
+  showBlocked?:    boolean
 }
 
 export default function ScheduleConfig({
@@ -325,10 +312,8 @@ export default function ScheduleConfig({
 
   function copyToAll(cfg: DayConfig) {
     const next: WeekConfig = {}
-    for (let i=0;i<7;i++) {
-      next[i] = value[i].enabled
-        ? { ...cfg, enabled:true }
-        : { ...value[i] }
+    for (let i=0; i<7; i++) {
+      next[i] = value[i].enabled ? { ...cfg, enabled:true } : { ...value[i] }
     }
     onChange(next)
   }
@@ -337,18 +322,35 @@ export default function ScheduleConfig({
 
   return (
     <div>
-      <style>{`@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}`}</style>
+      <style>{`
+        @keyframes fadeIn { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
+
+        /* Two-column grid — stacks to single column on narrow screens */
+        .sch-grid-2 {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+        }
+        @media (max-width: 420px) {
+          .sch-grid-2 {
+            grid-template-columns: 1fr;
+          }
+          .sch-summary {
+            display: none;
+          }
+        }
+      `}</style>
 
       {/* Quick day toggles */}
       <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:16 }}>
         {DAYS_SHORT.map((d,i) => (
           <button key={i} type="button"
             onClick={()=>updateDay(i,{...value[i],enabled:!value[i].enabled})}
-            style={{ padding:'7px 12px', borderRadius:T.r100, border:`2px solid ${value[i].enabled?theme.primary:T.nude}`, background:value[i].enabled?theme.primary:T.off, color:value[i].enabled?'#fff':T.muted, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:T.fontSans, transition:'all 0.15s', boxShadow:value[i].enabled?`0 2px 6px ${theme.primary}33`:'none' }}>
+            style={{ padding:'7px 11px', borderRadius:T.r100, border:`2px solid ${value[i].enabled?theme.primary:T.nude}`, background:value[i].enabled?theme.primary:T.off, color:value[i].enabled?'#fff':T.muted, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:T.fontSans, transition:'all 0.15s', boxShadow:value[i].enabled?`0 2px 6px ${theme.primary}33`:'none' }}>
             {d}
           </button>
         ))}
-        <span style={{ fontSize:12, color:T.muted, display:'flex', alignItems:'center', marginLeft:4 }}>
+        <span style={{ fontSize:12, color:T.muted, display:'flex', alignItems:'center', marginLeft:2 }}>
           {activeCount} dia{activeCount!==1?'s':''} ativo{activeCount!==1?'s':''}
         </span>
       </div>
@@ -363,7 +365,6 @@ export default function ScheduleConfig({
         ))}
       </div>
 
-      {/* Blocked slots */}
       {showBlocked && (
         <BlockedSlotsSection blocked={blocked} onChange={onBlockedChange} theme={theme}/>
       )}
@@ -371,13 +372,11 @@ export default function ScheduleConfig({
   )
 }
 
-// ─── Slot generation utility ────────────────────────────────────────────────
-/** Generate all available slot strings for a given day, respecting lunch and duration */
+// ─── Utilities ────────────────────────────────────────────────────────────
 export function generateSlots(cfg: DayConfig): string[] {
   return previewSlots(cfg)
 }
 
-/** Convert WeekConfig to the DB availability rows format */
 export function weekConfigToRows(profId: string, config: WeekConfig) {
   return Object.entries(config)
     .filter(([,cfg]) => cfg.enabled)
