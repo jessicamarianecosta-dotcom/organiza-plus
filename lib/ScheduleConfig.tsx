@@ -109,7 +109,7 @@ function DayCard({ dayIdx, cfg, onChange, theme, onCopyToAll }: {
   const slots = previewSlots(cfg)
 
   return (
-    <div className="sch-card" style={{
+    <div style={{
       borderRadius: T.r16,
       border:       `2px solid ${cfg.enabled ? theme.pale : T.nude}`,
       background:   cfg.enabled ? theme.glow : T.off,
@@ -131,7 +131,7 @@ function DayCard({ dayIdx, cfg, onChange, theme, onCopyToAll }: {
         </span>
 
         {cfg.enabled && (
-          <span className="sch-summary" style={{ fontSize:11, color:theme.primary, fontWeight:600, textAlign:'right', lineHeight:1.4 }}>
+          <span style={{ fontSize:11, color:theme.primary, fontWeight:600, textAlign:'right', lineHeight:1.4, flexShrink:0, maxWidth:90, overflow:'hidden' }}>
             {cfg.start}–{cfg.end}
             {cfg.lunchStart && cfg.lunchEnd ? <><br/>🍽 {cfg.lunchStart}–{cfg.lunchEnd}</> : ''}
           </span>
@@ -155,27 +155,27 @@ function DayCard({ dayIdx, cfg, onChange, theme, onCopyToAll }: {
           <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.06em', margin:'0 0 8px' }}>
             Horário de trabalho
           </p>
-          <div className="sch-grid-2" style={{ marginBottom:16 }}>
-            <TI label="Entrada" value={cfg.start} set={v=>up('start',v)}/>
-            <TI label="Saída"   value={cfg.end}   set={v=>up('end',v)}/>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:10, marginBottom:16 }}>
+            <div style={{ flex:'1 1 140px', minWidth:0 }}><TI label="Entrada" value={cfg.start} set={v=>up('start',v)}/></div>
+            <div style={{ flex:'1 1 140px', minWidth:0 }}><TI label="Saída"   value={cfg.end}   set={v=>up('end',v)}/></div>
           </div>
 
           {/* Lunch break — always visible */}
           <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.06em', margin:'0 0 8px', display:'flex', alignItems:'center', gap:6 }}>
             🍽 Intervalo de almoço
           </p>
-          <div className="sch-grid-2" style={{ marginBottom:16, padding:'12px', background:T.white, borderRadius:T.r12, border:`1px solid ${theme.pale}` }}>
-            <TI label="Início do almoço"   value={cfg.lunchStart||'12:00'} set={v=>up('lunchStart',v)}/>
-            <TI label="Término do almoço"  value={cfg.lunchEnd  ||'13:00'} set={v=>up('lunchEnd',v)}/>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:10, marginBottom:16, padding:'12px', background:T.white, borderRadius:T.r12, border:`1px solid ${theme.pale}`, boxSizing:'border-box' }}>
+            <div style={{ flex:'1 1 140px', minWidth:0 }}><TI label="Início do almoço"  value={cfg.lunchStart||'12:00'} set={v=>up('lunchStart',v)}/></div>
+            <div style={{ flex:'1 1 140px', minWidth:0 }}><TI label="Término do almoço" value={cfg.lunchEnd  ||'13:00'} set={v=>up('lunchEnd',v)}/></div>
           </div>
 
           {/* Duration + break */}
           <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.06em', margin:'0 0 8px' }}>
             Configuração de consultas
           </p>
-          <div className="sch-grid-2" style={{ marginBottom:14 }}>
-            <Select label="⏱ Duração"         value={cfg.apptDuration} set={v=>up('apptDuration',v)} options={DURATION_OPTIONS}/>
-            <Select label="🔄 Intervalo entre" value={cfg.breakMins}    set={v=>up('breakMins',v)}    options={BREAK_OPTIONS}/>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:10, marginBottom:14 }}>
+            <div style={{ flex:'1 1 140px', minWidth:0 }}><Select label="⏱ Duração"         value={cfg.apptDuration} set={v=>up('apptDuration',v)} options={DURATION_OPTIONS}/></div>
+            <div style={{ flex:'1 1 140px', minWidth:0 }}><Select label="🔄 Intervalo entre" value={cfg.breakMins}    set={v=>up('breakMins',v)}    options={BREAK_OPTIONS}/></div>
           </div>
 
           {/* Slot preview */}
@@ -237,20 +237,24 @@ function BlockedSlotsSection({ blocked, onChange, theme }: {
         </div>
       </div>
       <div style={{ padding:'14px' }}>
-        <div className="sch-grid-2" style={{ marginBottom:10 }}>
-          <input type="date" value={date} onChange={e=>setDate(e.target.value)}
-            style={{ padding:'9px 10px', fontSize:13, color:T.dark, background:T.off, border:`1.5px solid ${fi?T.sage:T.nude}`, borderRadius:T.r10, outline:'none', fontFamily:T.fontSans, width:'100%', boxSizing:'border-box' }}
-            onFocus={()=>setFi(true)} onBlur={()=>setFi(false)}/>
-          <button type="button" onClick={()=>setAllDay(!allDay)}
-            style={{ padding:'9px 10px', borderRadius:T.r10, border:`1.5px solid ${!allDay?T.sage:T.nude}`, background:!allDay?T.sageG:T.off, color:!allDay?T.sage:T.muted, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:T.fontSans, transition:'all 0.15s', width:'100%', boxSizing:'border-box' }}>
-            {allDay ? '🕐 Horário específico' : '📅 Dia inteiro'}
-          </button>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:10, marginBottom:10 }}>
+          <div style={{ flex:'1 1 140px', minWidth:0 }}>
+            <input type="date" value={date} onChange={e=>setDate(e.target.value)}
+              style={{ padding:'9px 10px', fontSize:13, color:T.dark, background:T.off, border:`1.5px solid ${fi?T.sage:T.nude}`, borderRadius:T.r10, outline:'none', fontFamily:T.fontSans, width:'100%', boxSizing:'border-box' }}
+              onFocus={()=>setFi(true)} onBlur={()=>setFi(false)}/>
+          </div>
+          <div style={{ flex:'1 1 140px', minWidth:0 }}>
+            <button type="button" onClick={()=>setAllDay(!allDay)}
+              style={{ padding:'9px 10px', borderRadius:T.r10, border:`1.5px solid ${!allDay?T.sage:T.nude}`, background:!allDay?T.sageG:T.off, color:!allDay?T.sage:T.muted, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:T.fontSans, transition:'all 0.15s', width:'100%', boxSizing:'border-box' }}>
+              {allDay ? '🕐 Horário específico' : '📅 Dia inteiro'}
+            </button>
+          </div>
         </div>
 
         {!allDay && (
-          <div className="sch-grid-2" style={{ marginBottom:10 }}>
-            <TI label="Das" value={start} set={setStart}/>
-            <TI label="Até" value={end}   set={setEnd}/>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:10, marginBottom:10 }}>
+            <div style={{ flex:'1 1 140px', minWidth:0 }}><TI label="Das" value={start} set={setStart}/></div>
+            <div style={{ flex:'1 1 140px', minWidth:0 }}><TI label="Até" value={end}   set={setEnd}/></div>
           </div>
         )}
 
@@ -324,21 +328,6 @@ export default function ScheduleConfig({
     <div>
       <style>{`
         @keyframes fadeIn { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
-
-        /* Two-column grid — stacks to single column on narrow screens */
-        .sch-grid-2 {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
-        }
-        @media (max-width: 420px) {
-          .sch-grid-2 {
-            grid-template-columns: 1fr;
-          }
-          .sch-summary {
-            display: none;
-          }
-        }
       `}</style>
 
       {/* Quick day toggles */}
