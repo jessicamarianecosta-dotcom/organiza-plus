@@ -7,7 +7,8 @@ import { ptBR } from 'date-fns/locale'
 import { supabase, Profile, Appointment } from '@/lib/supabase'
 import { T, GlobalStyles, Btn, Badge, Input, Alert, ProgressBar } from '@/lib/ds'
 import DynamicSpecialties from '@/lib/DynamicSpecialties'
-import { LayoutDashboard, Calendar, Users, Clock, Settings, Globe, LogOut, TrendingUp, CreditCard, ExternalLink, CheckCircle, XCircle, X, Menu, ChevronRight, Bell, Upload } from 'lucide-react'
+import PhotoCropper from '@/lib/PhotoCropper'
+import { LayoutDashboard, Calendar, Users, Clock, Settings, Globe, LogOut, TrendingUp, CreditCard, ExternalLink, CheckCircle, XCircle, X, Menu, ChevronRight, Bell } from 'lucide-react'
 
 const DAYS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
 
@@ -433,9 +434,7 @@ function ProfileTab({ profile, onSave }: { profile: Profile|null, onSave:()=>voi
   const [form, setForm] = useState({ name:'', bio:'', whatsapp:'', city:'', state:'', specialties:'', crm:'', instagram:'' })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [uploading, setUploading] = useState(false)
   const [photo, setPhoto] = useState('')
-  const fileRef = { current: null as HTMLInputElement|null }
 
   useEffect(() => {
     if (!profile) return
@@ -443,14 +442,12 @@ function ProfileTab({ profile, onSave }: { profile: Profile|null, onSave:()=>voi
     setPhoto(profile.photo_url||'')
   }, [profile])
 
-  async function upload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]; if (!file) return
-    setUploading(true)
+  async function uploadPhoto(file: File): Promise<string> {
     const fd = new FormData(); fd.append('file', file)
     const res = await fetch('/api/upload', { method:'POST', body:fd })
     const { url } = await res.json()
-    if (url) setPhoto(url)
-    setUploading(false)
+    if (!url) throw new Error('Não foi possível enviar a foto. Tente novamente.')
+    return url
   }
 
   async function save(e: React.FormEvent) {
@@ -468,20 +465,11 @@ function ProfileTab({ profile, onSave }: { profile: Profile|null, onSave:()=>voi
 
       {/* Photo */}
       <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:24, marginBottom:20 }}>
-        <p style={{ fontWeight:700, fontSize:14, color:T.dark, marginBottom:16 }}>Foto de perfil</p>
-        <div style={{ display:'flex', alignItems:'center', gap:20 }}>
-          <div style={{ width:80, height:80, borderRadius:'50%', background:T.sageG, border:`3px solid ${T.sageP}`, overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center', fontSize:32, flexShrink:0 }}>
-            {photo ? <img src={photo} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/> : '👤'}
-          </div>
-          <div>
-            <p style={{ fontSize:13, color:T.muted, marginBottom:10 }}>JPG, PNG ou WebP · máx 5MB</p>
-            <input type="file" accept="image/*" style={{ display:'none' }} onChange={upload} ref={el => { fileRef.current = el }}/>
-            <button type="button" onClick={()=>fileRef.current?.click()} disabled={uploading}
-              style={{ display:'flex', alignItems:'center', gap:8, background:T.sageG, border:`1px solid ${T.sageP}`, color:T.sage, borderRadius:T.r12, padding:'9px 16px', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:T.fontSans }}>
-              <Upload size={14}/> {uploading ? 'Enviando...' : 'Trocar foto'}
-            </button>
-          </div>
-        </div>
+        <PhotoCropper
+          value={photo}
+          onChange={setPhoto}
+          onUpload={uploadPhoto}
+        />
       </div>
 
       {/* Form */}
