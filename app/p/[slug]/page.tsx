@@ -251,7 +251,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
         </button>
       </nav>
 
-      {/* ── HERO: banner + circular avatar ───────────────────────────────── */}
+      {/* ── HERO: gradiente + avatar circular ────────────────────────────── */}
       <section style={{
         background:`linear-gradient(160deg, ${th.dark} 0%, ${th.dark}f0 55%, ${th.primary}30 100%)`,
         position:'relative', overflow:'hidden',
@@ -260,30 +260,20 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
         <div style={{ position:'absolute', top:-120, right:-120, width:500, height:500, borderRadius:'50%', background:`${th.primary}12`, pointerEvents:'none' }}/>
         <div style={{ position:'absolute', bottom:-80, left:-80, width:300, height:300, borderRadius:'50%', background:`${th.primary}08`, pointerEvents:'none' }}/>
 
-        {/* Cover banner */}
-        <div style={{ height:'clamp(200px,28vw,260px)', position:'relative', overflow:'hidden' }}>
-          {profile.photo_url ? (
-            <img src={profile.photo_url} alt="" aria-hidden="true" loading="lazy" decoding="async"
-              style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 20%', filter:'brightness(0.38) blur(1px)', display:'block' }}/>
-          ) : (
-            <div style={{ position:'absolute', inset:0, background:`linear-gradient(135deg, ${th.primary}35 0%, ${th.dark} 100%)` }}/>
-          )}
-        </div>
-
         {/* Profile content — centered column */}
-        <div className="fade-up" style={{ display:'flex', flexDirection:'column', alignItems:'center', marginTop:-64, position:'relative', zIndex:2, padding:'0 clamp(16px,5vw,32px) clamp(48px,8vw,80px)' }}>
+        <div className="fade-up" style={{ display:'flex', flexDirection:'column', alignItems:'center', position:'relative', zIndex:2, padding:'clamp(88px,14vw,120px) clamp(16px,5vw,32px) clamp(48px,8vw,80px)' }}>
 
           {/* Circular avatar */}
           <div style={{
-            width:'clamp(108px,20vw,132px)', height:'clamp(108px,20vw,132px)',
+            width:'clamp(140px,26vw,172px)', height:'clamp(140px,26vw,172px)',
             borderRadius:'50%', overflow:'hidden', flexShrink:0,
-            border:`5px solid ${th.dark}`,
-            boxShadow:`0 0 0 3px rgba(255,255,255,0.18), 0 16px 48px rgba(0,0,0,0.6)`,
-            background:th.pale, display:'flex', alignItems:'center', justifyContent:'center', fontSize:44,
+            border:'4px solid rgba(255,255,255,0.9)',
+            boxShadow:`0 0 0 2px ${th.primary}60, 0 16px 48px rgba(0,0,0,0.5)`,
+            background:th.dark, display:'flex', alignItems:'center', justifyContent:'center', fontSize:56,
           }}>
             {profile.photo_url
               ? <img src={profile.photo_url} alt={profile.name} loading="lazy" decoding="async"
-                  style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'top center' }}/>
+                  style={{ width:'100%', height:'100%', objectFit:'contain' }}/>
               : <span>👩‍⚕️</span>}
           </div>
 
