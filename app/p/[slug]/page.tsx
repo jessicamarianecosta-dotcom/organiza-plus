@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, use, useRef } from 'react'
-import { supabase, Profile, Availability } from '@/lib/supabase'
+import { supabase, Profile, Availability, ScheduleBreak } from '@/lib/supabase'
 import type { AgendaBlock } from '@/lib/ScheduleConfig'
 import { T, GlobalStyles } from '@/lib/ds'
 import { getTemplate } from '@/lib/templates'
@@ -100,6 +100,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
   const [selTime, setSelTime]   = useState<string|null>(null)
   const [taken, setTaken]       = useState<string[]>([])
   const [agendaBlocks, setAgendaBlocks] = useState<AgendaBlock[]>([])
+  const [schedBreaks, setSchedBreaks]   = useState<ScheduleBreak[]>([])
   const [step, setStep]         = useState<'pick'|'form'|'done'>('pick')
   const [clientName, setCN]     = useState('')
   const [clientPhone, setCP]    = useState('')
@@ -128,6 +129,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
       setTmpl(getTemplate(p.profession || ''))
       supabase.from('availability').select('*').eq('professional_id', p.id).eq('active', true).then(({ data }) => setAvail(data||[]))
       supabase.from('agenda_blocks').select('*').eq('professional_id', p.id).then(({ data }) => setAgendaBlocks((data||[]) as AgendaBlock[]))
+      supabase.from('schedule_breaks').select('*').eq('professional_id', p.id).then(({ data }) => setSchedBreaks((data||[]) as ScheduleBreak[]))
       setLoading(false)
       track(p.id, 'page_view')
     })
@@ -147,14 +149,21 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
 
   const dayAvail = selDate ? avail.find(a=>a.day_of_week===new Date(selDate+'T12:00').getDay()) : null
   const rawSlots = dayAvail ? genSlots(dayAvail.start_time, dayAvail.end_time, dayAvail.slot_minutes) : []
-  // Filter out slots that fall inside a 'horario' block for the selected date
+  const selDow = selDate ? new Date(selDate+'T12:00').getDay() : -1
+  const daySchedBreaks = schedBreaks.filter(b => b.weekday === selDow)
+  // Remove slots inside agenda_blocks (one-off date blocks) and schedule_breaks (weekly recurring)
   const slots = selDate ? rawSlots.filter(s => {
     const [sh,sm] = s.split(':').map(Number)
     const slotMins = sh*60+sm
-    return !agendaBlocks.some(b => {
+    if (agendaBlocks.some(b => {
       if (b.tipo !== 'horario' || b.data_inicial !== selDate) return false
       const [bh,bm] = (b.hora_inicio||'00:00').split(':').map(Number)
       const [eh,em] = (b.hora_fim||'23:59').split(':').map(Number)
+      return slotMins >= bh*60+bm && slotMins < eh*60+em
+    })) return false
+    return !daySchedBreaks.some(b => {
+      const [bh,bm] = b.start_time.split(':').map(Number)
+      const [eh,em] = b.end_time.split(':').map(Number)
       return slotMins >= bh*60+bm && slotMins < eh*60+em
     })
   }) : rawSlots

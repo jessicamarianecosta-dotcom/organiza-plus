@@ -4,12 +4,12 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { supabase, Profile, Appointment } from '@/lib/supabase'
+import { supabase, Profile, Appointment, ScheduleBreak } from '@/lib/supabase'
 import { T, GlobalStyles, Btn, Badge, Input, Alert, ProgressBar } from '@/lib/ds'
 import DynamicSpecialties from '@/lib/DynamicSpecialties'
 import PhotoCropper from '@/lib/PhotoCropper'
 import { AgendaBlocksSection, AgendaBlock } from '@/lib/ScheduleConfig'
-import { LayoutDashboard, Calendar, Users, Clock, Settings, Globe, LogOut, TrendingUp, CreditCard, ExternalLink, CheckCircle, XCircle, X, Menu, ChevronRight, Bell } from 'lucide-react'
+import { LayoutDashboard, Calendar, Users, Clock, Settings, Globe, LogOut, TrendingUp, CreditCard, ExternalLink, CheckCircle, XCircle, X, Plus, Menu, ChevronRight, Bell } from 'lucide-react'
 
 const DAYS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
 
@@ -378,11 +378,18 @@ function DashboardContent() {
 
 function AvailabilityTab({ profile }: { profile: Profile|null }) {
   const DAYS_FULL = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
-  const [avail, setAvail] = useState<{day:number,start:string,end:string}[]>([])
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [blocks, setBlocks] = useState<AgendaBlock[]>([])
+  const [avail,    setAvail]    = useState<{day:number,start:string,end:string}[]>([])
+  const [saving,   setSaving]   = useState(false)
+  const [saved,    setSaved]    = useState(false)
+  const [blocks,   setBlocks]   = useState<AgendaBlock[]>([])
   const [blockMsg, setBlockMsg] = useState('')
+  const [breaks,   setBreaks]   = useState<ScheduleBreak[]>([])
+  const [expDays,  setExpDays]  = useState<Set<number>>(new Set())
+  const [addFor,   setAddFor]   = useState<number|null>(null)
+  const [bStart,   setBStart]   = useState('12:00')
+  const [bEnd,     setBEnd]     = useState('13:00')
+  const [bDesc,    setBDesc]    = useState('')
+  const [bSaving,  setBSaving]  = useState(false)
 
   useEffect(() => {
     if (!profile) return
@@ -390,10 +397,13 @@ function AvailabilityTab({ profile }: { profile: Profile|null }) {
       .then(({data}) => { if(data) setAvail(data.map(d=>({day:d.day_of_week,start:d.start_time,end:d.end_time}))) })
     supabase.from('agenda_blocks').select('*').eq('professional_id',profile.id).order('data_inicial',{ascending:true})
       .then(({data}) => { if(data) setBlocks(data as AgendaBlock[]) })
+    supabase.from('schedule_breaks').select('*').eq('professional_id',profile.id).order('weekday').order('start_time')
+      .then(({data}) => { if(data) setBreaks(data as ScheduleBreak[]) })
   }, [profile])
 
   function toggle(d:number) { setAvail(p=>p.some(a=>a.day===d)?p.filter(a=>a.day!==d):[...p,{day:d,start:'08:00',end:'18:00'}].sort((a,b)=>a.day-b.day)) }
   function upd(d:number,k:string,v:string) { setAvail(p=>p.map(a=>a.day===d?{...a,[k]:v}:a)) }
+  function toggleExp(d:number) { setExpDays(p=>{ const n=new Set(p); n.has(d)?n.delete(d):n.add(d); return n }) }
 
   async function save() {
     if (!profile) return; setSaving(true)
@@ -407,17 +417,42 @@ function AvailabilityTab({ profile }: { profile: Profile|null }) {
     const { data, error } = await supabase.from('agenda_blocks').insert({ ...b, professional_id: profile.id }).select().single()
     if (!error && data) {
       setBlocks(prev => [...prev, data as AgendaBlock].sort((a,b)=>a.data_inicial.localeCompare(b.data_inicial)))
-      setBlockMsg('Bloqueio adicionado!')
-      setTimeout(()=>setBlockMsg(''),2500)
+      setBlockMsg('Bloqueio adicionado!'); setTimeout(()=>setBlockMsg(''),2500)
     }
   }
 
   async function removeBlock(id: string, index: number) {
     if (!profile) return
-    if (id) {
-      await supabase.from('agenda_blocks').delete().eq('id', id)
-    }
+    if (id) await supabase.from('agenda_blocks').delete().eq('id', id)
     setBlocks(prev => prev.filter((_,i)=>i!==index))
+  }
+
+  async function addBreak(weekday: number) {
+    if (!profile || bSaving) return
+    setBSaving(true)
+    const { data, error } = await supabase.from('schedule_breaks')
+      .insert({ professional_id:profile.id, weekday, start_time:bStart, end_time:bEnd, description:bDesc.trim()||null })
+      .select().single()
+    setBSaving(false)
+    if (!error && data) {
+      setBreaks(prev=>[...prev, data as ScheduleBreak].sort((a,b)=>a.weekday-b.weekday||a.start_time.localeCompare(b.start_time)))
+      setAddFor(null); setBDesc('')
+    }
+  }
+
+  async function removeBreak(id: string) {
+    await supabase.from('schedule_breaks').delete().eq('id', id)
+    setBreaks(prev=>prev.filter(b=>b.id!==id))
+  }
+
+  function brkIcon(desc: string|null) {
+    const d = (desc||'').toLowerCase()
+    if (d.includes('almoç')||d.includes('almoc')) return '🍽'
+    if (d.includes('café')||d.includes('cafe')||d.includes('lanche')) return '☕'
+    if (d.includes('reuni')) return '📋'
+    if (d.includes('curso')) return '📚'
+    if (d.includes('pausa')) return '⏸'
+    return '🕐'
   }
 
   const th = { primary:T.sage, glow:T.sageG, pale:T.sageP }
@@ -425,31 +460,116 @@ function AvailabilityTab({ profile }: { profile: Profile|null }) {
   return (
     <div className="anim-fade">
       <h1 style={{ fontFamily:T.fontSerif, fontSize:28, color:T.dark, marginBottom:6 }}>Horários de atendimento</h1>
-      <p style={{ fontSize:14, color:T.muted, marginBottom:24 }}>Configure os dias e horários disponíveis para agendamento.</p>
+      <p style={{ fontSize:14, color:T.muted, marginBottom:24 }}>Configure os dias, horários e intervalos disponíveis para agendamento.</p>
 
       {/* Availability days */}
       <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:24, marginBottom:20 }}>
         <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:20 }}>
           {DAYS_FULL.map((day,i) => {
             const a = avail.find(x=>x.day===i)
+            const dayBreaks = breaks.filter(b=>b.weekday===i)
+            const isExp = expDays.has(i)
             return (
-              <div key={day} style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 16px', borderRadius:T.r14, border:`2px solid ${a?T.sageP:T.nude}`, background:a?T.sageG:T.off, transition:'all 0.15s' }}>
-                <button type="button" onClick={()=>toggle(i)} style={{ width:22, height:22, borderRadius:T.r4, border:`2px solid ${a?T.sage:T.nude}`, background:a?T.sage:T.white, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0, transition:'all 0.15s' }}>
-                  {a && <span style={{ color:T.cream, fontSize:12, fontWeight:700 }}>✓</span>}
-                </button>
-                <span style={{ fontSize:14, fontWeight:600, color:a?T.dark:T.muted, width:80, flexShrink:0 }}>{day}</span>
-                {a ? (
-                  <div style={{ display:'flex', alignItems:'center', gap:10, flex:1, flexWrap:'wrap' }}>
-                    <input type="time" value={a.start} onChange={e=>upd(i,'start',e.target.value)} style={{ border:`1px solid ${T.sageP}`, background:T.white, borderRadius:T.r10, padding:'7px 12px', fontSize:13, outline:'none', color:T.dark, fontFamily:T.fontSans }}/>
-                    <span style={{ fontSize:13, color:T.muted }}>até</span>
-                    <input type="time" value={a.end} onChange={e=>upd(i,'end',e.target.value)} style={{ border:`1px solid ${T.sageP}`, background:T.white, borderRadius:T.r10, padding:'7px 12px', fontSize:13, outline:'none', color:T.dark, fontFamily:T.fontSans }}/>
+              <div key={day} style={{ borderRadius:T.r14, border:`2px solid ${a?T.sageP:T.nude}`, background:a?T.sageG:T.off, transition:'all 0.15s', overflow:'hidden' }}>
+
+                {/* Main row */}
+                <div style={{ display:'flex', alignItems:'center', gap:12, padding:'13px 16px', flexWrap:'wrap' }}>
+                  <button type="button" onClick={()=>toggle(i)}
+                    style={{ width:22, height:22, borderRadius:T.r4, border:`2px solid ${a?T.sage:T.nude}`, background:a?T.sage:T.white, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0, transition:'all 0.15s' }}>
+                    {a && <span style={{ color:T.cream, fontSize:12, fontWeight:700 }}>✓</span>}
+                  </button>
+                  <span style={{ fontSize:14, fontWeight:600, color:a?T.dark:T.muted, width:80, flexShrink:0 }}>{day}</span>
+
+                  {a ? (
+                    <>
+                      <div style={{ display:'flex', alignItems:'center', gap:8, flex:1, flexWrap:'wrap', minWidth:160 }}>
+                        <input type="time" value={a.start} onChange={e=>upd(i,'start',e.target.value)}
+                          style={{ border:`1px solid ${T.sageP}`, background:T.white, borderRadius:T.r10, padding:'7px 12px', fontSize:13, outline:'none', color:T.dark, fontFamily:T.fontSans }}/>
+                        <span style={{ fontSize:12, color:T.muted }}>até</span>
+                        <input type="time" value={a.end} onChange={e=>upd(i,'end',e.target.value)}
+                          style={{ border:`1px solid ${T.sageP}`, background:T.white, borderRadius:T.r10, padding:'7px 12px', fontSize:13, outline:'none', color:T.dark, fontFamily:T.fontSans }}/>
+                      </div>
+                      <button type="button" onClick={()=>toggleExp(i)}
+                        style={{ display:'flex', alignItems:'center', gap:4, padding:'5px 10px', borderRadius:T.r10, border:`1.5px solid ${isExp?T.sage:T.sageP}`, background:isExp?T.sageG:T.white, color:isExp?T.sage:T.muted, fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:T.fontSans, flexShrink:0, whiteSpace:'nowrap', transition:'all 0.15s' }}>
+                        ⏸ {dayBreaks.length>0?`${dayBreaks.length} intervalo${dayBreaks.length>1?'s':''} `:''}{isExp?'▲':'▼'}
+                      </button>
+                    </>
+                  ) : <span style={{ fontSize:13, color:T.muted, fontStyle:'italic' }}>Clique para ativar</span>}
+                </div>
+
+                {/* Breaks panel */}
+                {a && isExp && (
+                  <div style={{ padding:'0 16px 14px', borderTop:`1px solid ${T.sageP}` }}>
+                    <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.06em', margin:'12px 0 8px' }}>
+                      Intervalos — {day}
+                    </p>
+
+                    {dayBreaks.length > 0 && (
+                      <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:10 }}>
+                        {dayBreaks.map(b=>(
+                          <div key={b.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 11px', background:T.white, borderRadius:T.r10, border:`1px solid ${T.sageP}` }}>
+                            <span style={{ fontSize:16, flexShrink:0 }}>{brkIcon(b.description)}</span>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <span style={{ fontWeight:600, fontSize:13, color:T.dark }}>{b.description||'Intervalo'}</span>
+                              <span style={{ fontSize:12, color:T.muted, marginLeft:8 }}>{b.start_time.slice(0,5)} às {b.end_time.slice(0,5)}</span>
+                            </div>
+                            <button type="button" onClick={()=>removeBreak(b.id)}
+                              style={{ background:'none', border:'none', cursor:'pointer', color:T.muted, display:'flex', padding:2, transition:'color 0.15s', flexShrink:0 }}
+                              onMouseEnter={e=>e.currentTarget.style.color=T.red}
+                              onMouseLeave={e=>e.currentTarget.style.color=T.muted}>
+                              <X size={13}/>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {addFor === i ? (
+                      <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'flex-end', padding:'12px', background:T.white, borderRadius:T.r12, border:`1px solid ${T.sageP}`, marginTop:4 }}>
+                        <div>
+                          <label style={{ display:'block', fontSize:10, fontWeight:700, color:T.muted, marginBottom:3, textTransform:'uppercase', letterSpacing:'0.05em' }}>Das</label>
+                          <input type="time" value={bStart} onChange={e=>setBStart(e.target.value)}
+                            style={{ padding:'7px 10px', fontSize:13, color:T.dark, background:T.off, border:`1.5px solid ${T.sageP}`, borderRadius:T.r10, outline:'none', fontFamily:T.fontSans }}/>
+                        </div>
+                        <div>
+                          <label style={{ display:'block', fontSize:10, fontWeight:700, color:T.muted, marginBottom:3, textTransform:'uppercase', letterSpacing:'0.05em' }}>Até</label>
+                          <input type="time" value={bEnd} onChange={e=>setBEnd(e.target.value)}
+                            style={{ padding:'7px 10px', fontSize:13, color:T.dark, background:T.off, border:`1.5px solid ${T.sageP}`, borderRadius:T.r10, outline:'none', fontFamily:T.fontSans }}/>
+                        </div>
+                        <div style={{ flex:'1 1 140px', minWidth:0 }}>
+                          <label style={{ display:'block', fontSize:10, fontWeight:700, color:T.muted, marginBottom:3, textTransform:'uppercase', letterSpacing:'0.05em' }}>Descrição</label>
+                          <input type="text" value={bDesc} onChange={e=>setBDesc(e.target.value)} placeholder="Almoço, Café, Reunião..."
+                            style={{ padding:'7px 10px', fontSize:13, color:T.dark, background:T.off, border:`1.5px solid ${T.sageP}`, borderRadius:T.r10, outline:'none', fontFamily:T.fontSans, width:'100%', boxSizing:'border-box' }}
+                            onKeyDown={e=>e.key==='Enter'&&addBreak(i)}/>
+                        </div>
+                        <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+                          <button type="button" onClick={()=>addBreak(i)} disabled={bSaving}
+                            style={{ padding:'7px 14px', background:T.sage, color:'#fff', border:'none', borderRadius:T.r10, fontSize:12, fontWeight:700, cursor:bSaving?'not-allowed':'pointer', fontFamily:T.fontSans, opacity:bSaving?0.7:1 }}>
+                            {bSaving?'...':'✓ Adicionar'}
+                          </button>
+                          <button type="button" onClick={()=>setAddFor(null)}
+                            style={{ padding:'7px 10px', background:T.off, color:T.muted, border:`1px solid ${T.nude}`, borderRadius:T.r10, fontSize:12, cursor:'pointer', fontFamily:T.fontSans }}>
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button type="button"
+                        onClick={()=>{ setAddFor(i); setBDesc(''); setBStart('12:00'); setBEnd('13:00') }}
+                        style={{ display:'flex', alignItems:'center', gap:5, padding:'7px 12px', background:T.off, color:T.sage, border:`1.5px solid ${T.sageP}`, borderRadius:T.r10, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:T.fontSans, marginTop:dayBreaks.length>0?4:0, transition:'all 0.15s' }}
+                        onMouseEnter={e=>{e.currentTarget.style.background=T.sageG;e.currentTarget.style.borderColor=T.sage}}
+                        onMouseLeave={e=>{e.currentTarget.style.background=T.off;e.currentTarget.style.borderColor=T.sageP}}>
+                        <Plus size={12}/> Adicionar intervalo
+                      </button>
+                    )}
                   </div>
-                ) : <span style={{ fontSize:13, color:T.muted, fontStyle:'italic' }}>Clique para ativar</span>}
+                )}
               </div>
             )
           })}
         </div>
-        <button onClick={save} disabled={saving} style={{ width:'100%', padding:'14px', fontSize:15, fontWeight:700, color:T.cream, background:saved?T.sage:T.dark, border:'none', borderRadius:T.r14, cursor:'pointer', fontFamily:T.fontSans, transition:'background 0.2s' }}>
+        <button onClick={save} disabled={saving}
+          style={{ width:'100%', padding:'14px', fontSize:15, fontWeight:700, color:T.cream, background:saved?T.sage:T.dark, border:'none', borderRadius:T.r14, cursor:'pointer', fontFamily:T.fontSans, transition:'background 0.2s' }}>
           {saved ? '✓ Horários salvos!' : saving ? 'Salvando...' : 'Salvar horários'}
         </button>
       </div>

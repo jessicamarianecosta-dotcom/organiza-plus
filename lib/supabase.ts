@@ -55,3 +55,13 @@ export type BlockedDate = {
   blocked_date: string
   reason: string | null
 }
+
+export type ScheduleBreak = {
+  id: string
+  professional_id: string
+  weekday: number
+  start_time: string
+  end_time: string
+  description: string | null
+  created_at: string
+}
