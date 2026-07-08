@@ -8,6 +8,7 @@ import { supabase, Profile, Appointment } from '@/lib/supabase'
 import { T, GlobalStyles, Btn, Badge, Input, Alert, ProgressBar } from '@/lib/ds'
 import DynamicSpecialties from '@/lib/DynamicSpecialties'
 import PhotoCropper from '@/lib/PhotoCropper'
+import { AgendaBlocksSection, AgendaBlock } from '@/lib/ScheduleConfig'
 import { LayoutDashboard, Calendar, Users, Clock, Settings, Globe, LogOut, TrendingUp, CreditCard, ExternalLink, CheckCircle, XCircle, X, Menu, ChevronRight, Bell } from 'lucide-react'
 
 const DAYS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
@@ -380,11 +381,15 @@ function AvailabilityTab({ profile }: { profile: Profile|null }) {
   const [avail, setAvail] = useState<{day:number,start:string,end:string}[]>([])
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [blocks, setBlocks] = useState<AgendaBlock[]>([])
+  const [blockMsg, setBlockMsg] = useState('')
 
   useEffect(() => {
     if (!profile) return
     supabase.from('availability').select('*').eq('professional_id',profile.id).eq('active',true)
       .then(({data}) => { if(data) setAvail(data.map(d=>({day:d.day_of_week,start:d.start_time,end:d.end_time}))) })
+    supabase.from('agenda_blocks').select('*').eq('professional_id',profile.id).order('data_inicial',{ascending:true})
+      .then(({data}) => { if(data) setBlocks(data as AgendaBlock[]) })
   }, [profile])
 
   function toggle(d:number) { setAvail(p=>p.some(a=>a.day===d)?p.filter(a=>a.day!==d):[...p,{day:d,start:'08:00',end:'18:00'}].sort((a,b)=>a.day-b.day)) }
@@ -397,11 +402,33 @@ function AvailabilityTab({ profile }: { profile: Profile|null }) {
     setSaving(false); setSaved(true); setTimeout(()=>setSaved(false),2500)
   }
 
+  async function addBlock(b: AgendaBlock) {
+    if (!profile) return
+    const { data, error } = await supabase.from('agenda_blocks').insert({ ...b, professional_id: profile.id }).select().single()
+    if (!error && data) {
+      setBlocks(prev => [...prev, data as AgendaBlock].sort((a,b)=>a.data_inicial.localeCompare(b.data_inicial)))
+      setBlockMsg('Bloqueio adicionado!')
+      setTimeout(()=>setBlockMsg(''),2500)
+    }
+  }
+
+  async function removeBlock(id: string, index: number) {
+    if (!profile) return
+    if (id) {
+      await supabase.from('agenda_blocks').delete().eq('id', id)
+    }
+    setBlocks(prev => prev.filter((_,i)=>i!==index))
+  }
+
+  const th = { primary:T.sage, glow:T.sageG, pale:T.sageP }
+
   return (
     <div className="anim-fade">
       <h1 style={{ fontFamily:T.fontSerif, fontSize:28, color:T.dark, marginBottom:6 }}>Horários de atendimento</h1>
       <p style={{ fontSize:14, color:T.muted, marginBottom:24 }}>Configure os dias e horários disponíveis para agendamento.</p>
-      <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:24 }}>
+
+      {/* Availability days */}
+      <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:24, marginBottom:20 }}>
         <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:20 }}>
           {DAYS_FULL.map((day,i) => {
             const a = avail.find(x=>x.day===i)
@@ -412,7 +439,7 @@ function AvailabilityTab({ profile }: { profile: Profile|null }) {
                 </button>
                 <span style={{ fontSize:14, fontWeight:600, color:a?T.dark:T.muted, width:80, flexShrink:0 }}>{day}</span>
                 {a ? (
-                  <div style={{ display:'flex', alignItems:'center', gap:10, flex:1 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:10, flex:1, flexWrap:'wrap' }}>
                     <input type="time" value={a.start} onChange={e=>upd(i,'start',e.target.value)} style={{ border:`1px solid ${T.sageP}`, background:T.white, borderRadius:T.r10, padding:'7px 12px', fontSize:13, outline:'none', color:T.dark, fontFamily:T.fontSans }}/>
                     <span style={{ fontSize:13, color:T.muted }}>até</span>
                     <input type="time" value={a.end} onChange={e=>upd(i,'end',e.target.value)} style={{ border:`1px solid ${T.sageP}`, background:T.white, borderRadius:T.r10, padding:'7px 12px', fontSize:13, outline:'none', color:T.dark, fontFamily:T.fontSans }}/>
@@ -425,6 +452,16 @@ function AvailabilityTab({ profile }: { profile: Profile|null }) {
         <button onClick={save} disabled={saving} style={{ width:'100%', padding:'14px', fontSize:15, fontWeight:700, color:T.cream, background:saved?T.sage:T.dark, border:'none', borderRadius:T.r14, cursor:'pointer', fontFamily:T.fontSans, transition:'background 0.2s' }}>
           {saved ? '✓ Horários salvos!' : saving ? 'Salvando...' : 'Salvar horários'}
         </button>
+      </div>
+
+      {/* Agenda blocks */}
+      <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:24 }}>
+        <AgendaBlocksSection blocks={blocks} onAdd={addBlock} onRemove={removeBlock} theme={th}/>
+        {blockMsg && (
+          <div style={{ marginTop:12, padding:'10px 14px', background:T.sageG, border:`1px solid ${T.sageP}`, borderRadius:T.r10, fontSize:13, color:T.sage, fontWeight:600 }}>
+            ✓ {blockMsg}
+          </div>
+        )}
       </div>
     </div>
   )

@@ -25,6 +25,16 @@ export type BlockedSlot = {
   reason:     string
 }
 
+export type AgendaBlock = {
+  id?:          string
+  tipo:         'dia_inteiro' | 'horario' | 'ferias'
+  data_inicial: string
+  data_final?:  string
+  hora_inicio?: string
+  hora_fim?:    string
+  motivo?:      string
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────
 const DAYS_FULL  = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
 const DAYS_SHORT = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
@@ -357,6 +367,155 @@ export default function ScheduleConfig({
       {showBlocked && (
         <BlockedSlotsSection blocked={blocked} onChange={onBlockedChange} theme={theme}/>
       )}
+    </div>
+  )
+}
+
+// ─── AgendaBlocksSection (standalone export) ──────────────────────────────
+export function AgendaBlocksSection({ blocks, onAdd, onRemove, theme }: {
+  blocks:   AgendaBlock[]
+  onAdd:    (b: AgendaBlock) => void
+  onRemove: (id: string, index: number) => void
+  theme:    { primary:string; glow:string; pale:string }
+}) {
+  const [tipo,   setTipo]   = useState<AgendaBlock['tipo']>('dia_inteiro')
+  const [d1,     setD1]     = useState('')
+  const [d2,     setD2]     = useState('')
+  const [h1,     setH1]     = useState('09:00')
+  const [h2,     setH2]     = useState('10:00')
+  const [motivo, setMotivo] = useState('')
+  const [fd1,    setFd1]    = useState(false)
+  const [fd2,    setFd2]    = useState(false)
+  const [fm,     setFm]     = useState(false)
+
+  function canAdd() {
+    if (!d1) return false
+    if (tipo === 'ferias' && !d2) return false
+    return true
+  }
+
+  function add() {
+    if (!canAdd()) return
+    onAdd({
+      tipo,
+      data_inicial: d1,
+      data_final:   tipo === 'ferias' ? d2 : undefined,
+      hora_inicio:  tipo === 'horario' ? h1 : undefined,
+      hora_fim:     tipo === 'horario' ? h2 : undefined,
+      motivo:       motivo.trim() || undefined,
+    })
+    setD1(''); setD2(''); setMotivo('')
+  }
+
+  const TIPO_LABELS: Record<AgendaBlock['tipo'], { icon:string; label:string; hint:string }> = {
+    dia_inteiro: { icon:'📅', label:'Dia inteiro', hint:'Bloqueia o dia completo (ex: feriado)' },
+    horario:     { icon:'🕐', label:'Horário específico', hint:'Bloqueia um período do dia (ex: curso)' },
+    ferias:      { icon:'✈️', label:'Férias / Período', hint:'Bloqueia um intervalo de datas (ex: férias)' },
+  }
+
+  function fmtDate(s: string) {
+    if (!s) return ''
+    const [y,m,d] = s.split('-')
+    return `${d}/${m}/${y}`
+  }
+
+  return (
+    <div style={{ background:T.white, borderRadius:T.r16, border:`1px solid ${T.nude}`, overflow:'hidden' }}>
+      {/* Header */}
+      <div style={{ padding:'14px 16px', borderBottom:`1px solid ${T.nude}`, display:'flex', alignItems:'center', gap:8 }}>
+        <span style={{ fontSize:20 }}>🚫</span>
+        <div>
+          <p style={{ fontWeight:700, fontSize:14, color:T.dark, margin:0 }}>Bloqueios da agenda</p>
+          <p style={{ fontSize:12, color:T.muted, margin:0 }}>Feriados, férias, cursos ou pausas específicas</p>
+        </div>
+      </div>
+
+      <div style={{ padding:'14px 16px' }}>
+        {/* Type selector */}
+        <div style={{ display:'flex', gap:6, marginBottom:12, flexWrap:'wrap' }}>
+          {(Object.keys(TIPO_LABELS) as AgendaBlock['tipo'][]).map(t => (
+            <button key={t} type="button" onClick={()=>setTipo(t)}
+              style={{ display:'flex', alignItems:'center', gap:5, padding:'7px 12px', borderRadius:T.r10, border:`1.5px solid ${tipo===t?theme.primary:T.nude}`, background:tipo===t?theme.glow:T.off, color:tipo===t?theme.primary:T.muted, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:T.fontSans, transition:'all 0.15s', flexShrink:0 }}>
+              {TIPO_LABELS[t].icon} {TIPO_LABELS[t].label}
+            </button>
+          ))}
+        </div>
+        <p style={{ fontSize:11, color:T.muted, margin:'0 0 12px', fontStyle:'italic' }}>{TIPO_LABELS[tipo].hint}</p>
+
+        {/* Date inputs */}
+        {tipo === 'ferias' ? (
+          <div style={{ display:'flex', flexWrap:'wrap', gap:10, marginBottom:10 }}>
+            <div style={{ flex:'1 1 140px', minWidth:0 }}>
+              <label style={{ display:'block', fontSize:11, fontWeight:600, color:T.muted, marginBottom:4, textTransform:'uppercase', letterSpacing:'0.05em' }}>De</label>
+              <input type="date" value={d1} onChange={e=>setD1(e.target.value)}
+                style={{ padding:'9px 10px', fontSize:13, color:T.dark, background:T.off, border:`1.5px solid ${fd1?theme.primary:T.nude}`, borderRadius:T.r10, outline:'none', fontFamily:T.fontSans, width:'100%', boxSizing:'border-box' }}
+                onFocus={()=>setFd1(true)} onBlur={()=>setFd1(false)}/>
+            </div>
+            <div style={{ flex:'1 1 140px', minWidth:0 }}>
+              <label style={{ display:'block', fontSize:11, fontWeight:600, color:T.muted, marginBottom:4, textTransform:'uppercase', letterSpacing:'0.05em' }}>Até</label>
+              <input type="date" value={d2} onChange={e=>setD2(e.target.value)} min={d1}
+                style={{ padding:'9px 10px', fontSize:13, color:T.dark, background:T.off, border:`1.5px solid ${fd2?theme.primary:T.nude}`, borderRadius:T.r10, outline:'none', fontFamily:T.fontSans, width:'100%', boxSizing:'border-box' }}
+                onFocus={()=>setFd2(true)} onBlur={()=>setFd2(false)}/>
+            </div>
+          </div>
+        ) : (
+          <div style={{ marginBottom:10 }}>
+            <label style={{ display:'block', fontSize:11, fontWeight:600, color:T.muted, marginBottom:4, textTransform:'uppercase', letterSpacing:'0.05em' }}>Data</label>
+            <input type="date" value={d1} onChange={e=>setD1(e.target.value)}
+              style={{ padding:'9px 10px', fontSize:13, color:T.dark, background:T.off, border:`1.5px solid ${fd1?theme.primary:T.nude}`, borderRadius:T.r10, outline:'none', fontFamily:T.fontSans, width:'100%', boxSizing:'border-box' }}
+              onFocus={()=>setFd1(true)} onBlur={()=>setFd1(false)}/>
+          </div>
+        )}
+
+        {/* Time inputs (horario only) */}
+        {tipo === 'horario' && (
+          <div style={{ display:'flex', flexWrap:'wrap', gap:10, marginBottom:10 }}>
+            <div style={{ flex:'1 1 120px', minWidth:0 }}><TI label="Das" value={h1} set={setH1}/></div>
+            <div style={{ flex:'1 1 120px', minWidth:0 }}><TI label="Até" value={h2} set={setH2}/></div>
+          </div>
+        )}
+
+        {/* Reason + add button */}
+        <div style={{ display:'flex', gap:8, marginBottom:blocks.length>0?16:0 }}>
+          <input value={motivo} onChange={e=>setMotivo(e.target.value)} placeholder="Motivo (ex: Natal, Férias, Curso...)"
+            style={{ flex:1, padding:'9px 10px', fontSize:13, color:T.dark, background:T.off, border:`1.5px solid ${fm?theme.primary:T.nude}`, borderRadius:T.r10, outline:'none', fontFamily:T.fontSans, minWidth:0 }}
+            onFocus={()=>setFm(true)} onBlur={()=>setFm(false)}
+            onKeyDown={e=>e.key==='Enter'&&add()}/>
+          <button type="button" onClick={add} disabled={!canAdd()}
+            style={{ width:40, height:40, borderRadius:T.r10, background:canAdd()?theme.primary:T.nude, border:'none', cursor:canAdd()?'pointer':'not-allowed', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', flexShrink:0, transition:'background 0.15s' }}>
+            <Plus size={16}/>
+          </button>
+        </div>
+
+        {/* Block list */}
+        {blocks.length > 0 && (
+          <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
+            {blocks.map((b, i) => (
+              <div key={b.id||i} style={{ display:'flex', alignItems:'flex-start', gap:8, padding:'10px 12px', background:T.off, borderRadius:T.r12, border:`1px solid ${T.nude}` }}>
+                <span style={{ fontSize:16, flexShrink:0, marginTop:1 }}>{TIPO_LABELS[b.tipo].icon}</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <p style={{ fontWeight:600, fontSize:13, color:T.dark, margin:'0 0 1px' }}>
+                    {b.tipo==='ferias'
+                      ? `${fmtDate(b.data_inicial)} → ${fmtDate(b.data_final||'')}`
+                      : fmtDate(b.data_inicial)
+                    }
+                    {b.tipo==='horario' && ` · ${b.hora_inicio}–${b.hora_fim}`}
+                  </p>
+                  {b.motivo && <p style={{ fontSize:11, color:T.muted, margin:0 }}>{b.motivo}</p>}
+                  <p style={{ fontSize:10, color:T.muted, margin:0, fontStyle:'italic' }}>{TIPO_LABELS[b.tipo].label}</p>
+                </div>
+                <button type="button"
+                  onClick={()=>onRemove(b.id||'', i)}
+                  style={{ background:'none', border:'none', cursor:'pointer', color:T.muted, display:'flex', flexShrink:0, padding:2, transition:'color 0.15s', marginTop:2 }}
+                  onMouseEnter={e=>e.currentTarget.style.color=T.red}
+                  onMouseLeave={e=>e.currentTarget.style.color=T.muted}>
+                  <X size={14}/>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

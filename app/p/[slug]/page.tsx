@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, use, useRef } from 'react'
 import { supabase, Profile, Availability } from '@/lib/supabase'
+import type { AgendaBlock } from '@/lib/ScheduleConfig'
 import { T, GlobalStyles } from '@/lib/ds'
 import { getTemplate } from '@/lib/templates'
 import { MapPin, Clock, Monitor, Heart, ArrowRight, Check, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -98,6 +99,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
   const [selDate, setSelDate]   = useState<string|null>(null)
   const [selTime, setSelTime]   = useState<string|null>(null)
   const [taken, setTaken]       = useState<string[]>([])
+  const [agendaBlocks, setAgendaBlocks] = useState<AgendaBlock[]>([])
   const [step, setStep]         = useState<'pick'|'form'|'done'>('pick')
   const [clientName, setCN]     = useState('')
   const [clientPhone, setCP]    = useState('')
@@ -125,6 +127,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
       if (tc && THEMES[tc]) setTh(THEMES[tc])
       setTmpl(getTemplate(p.profession || ''))
       supabase.from('availability').select('*').eq('professional_id', p.id).eq('active', true).then(({ data }) => setAvail(data||[]))
+      supabase.from('agenda_blocks').select('*').eq('professional_id', p.id).then(({ data }) => setAgendaBlocks((data||[]) as AgendaBlock[]))
       setLoading(false)
       track(p.id, 'page_view')
     })
@@ -143,7 +146,18 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
   }
 
   const dayAvail = selDate ? avail.find(a=>a.day_of_week===new Date(selDate+'T12:00').getDay()) : null
-  const slots    = dayAvail ? genSlots(dayAvail.start_time, dayAvail.end_time, dayAvail.slot_minutes) : []
+  const rawSlots = dayAvail ? genSlots(dayAvail.start_time, dayAvail.end_time, dayAvail.slot_minutes) : []
+  // Filter out slots that fall inside a 'horario' block for the selected date
+  const slots = selDate ? rawSlots.filter(s => {
+    const [sh,sm] = s.split(':').map(Number)
+    const slotMins = sh*60+sm
+    return !agendaBlocks.some(b => {
+      if (b.tipo !== 'horario' || b.data_inicial !== selDate) return false
+      const [bh,bm] = (b.hora_inicio||'00:00').split(':').map(Number)
+      const [eh,em] = (b.hora_fim||'23:59').split(':').map(Number)
+      return slotMins >= bh*60+bm && slotMins < eh*60+em
+    })
+  }) : rawSlots
 
   // Calendar month navigation — no upper limit, cannot go before current month
   const _now = new Date()
@@ -651,6 +665,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
                     {/* ── Monthly calendar ───────────────────────────────── */}
                     <CalPicker
                       avail={avail}
+                      agendaBlocks={agendaBlocks}
                       selDate={selDate}
                       calView={calView}
                       canPrev={canGoPrev}
@@ -798,8 +813,9 @@ function BookInput({ label, value, set, placeholder, required=false, type='text'
 // ── Monthly calendar picker ────────────────────────────────────────────────
 const DOW_PT = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
 
-function CalPicker({ avail, selDate, calView, canPrev, canNext, onSelect, onPrev, onNext, th }: {
+function CalPicker({ avail, agendaBlocks, selDate, calView, canPrev, canNext, onSelect, onPrev, onNext, th }: {
   avail: Availability[]
+  agendaBlocks: AgendaBlock[]
   selDate: string | null
   calView: { year: number; month: number }
   canPrev: boolean
@@ -823,6 +839,14 @@ function CalPicker({ avail, selDate, calView, canPrev, canNext, onSelect, onPrev
 
   const monthLabel = format(firstOfMonth, 'MMMM yyyy', { locale: ptBR })
     .replace(/^\w/, c => c.toUpperCase())
+
+  function isDayBlocked(ds: string): boolean {
+    return agendaBlocks.some(b => {
+      if (b.tipo === 'dia_inteiro') return b.data_inicial === ds
+      if (b.tipo === 'ferias') return ds >= b.data_inicial && ds <= (b.data_final || b.data_inicial)
+      return false
+    })
+  }
 
   const navBtn = (disabled: boolean, onClick: ()=>void, children: React.ReactNode) => (
     <button type="button" onClick={onClick} disabled={disabled}
@@ -870,11 +894,12 @@ function CalPicker({ avail, selDate, calView, canPrev, canNext, onSelect, onPrev
         {cells.map((d, i) => {
           if (!d) return <div key={`e${i}`} style={{ aspectRatio:'1' }}/>
 
-          const ds       = format(d, 'yyyy-MM-dd')
-          const isPast   = d < today
-          const isAvail  = !isPast && avail.some(a => a.day_of_week === d.getDay())
-          const isSel    = selDate === ds
-          const isToday  = d.getTime() === today.getTime()
+          const ds         = format(d, 'yyyy-MM-dd')
+          const isPast     = d < today
+          const isBlocked  = !isPast && isDayBlocked(ds)
+          const isAvail    = !isPast && !isBlocked && avail.some(a => a.day_of_week === d.getDay())
+          const isSel      = selDate === ds
+          const isToday    = d.getTime() === today.getTime()
 
           let bg      = 'transparent'
           let color   = '#C0B8AE'
@@ -887,13 +912,15 @@ function CalPicker({ avail, selDate, calView, canPrev, canNext, onSelect, onPrev
             color = '#C0B8AE'; opacity = 0.45
           } else if (isSel) {
             bg = th.primary; color = '#fff'; border = `2px solid ${th.primary}`; cursor = 'pointer'; fw = 700
+          } else if (isBlocked) {
+            bg = '#FEF2F2'; color = '#FECACA'; border = '2px solid #FECACA'; opacity = 0.7
           } else if (isAvail) {
             bg = th.glow; color = th.primary; border = `2px solid ${th.pale}`; cursor = 'pointer'; fw = 600
           } else {
             color = '#C0B8AE'
           }
 
-          if (isToday && !isSel) border = `2px solid ${th.primary}70`
+          if (isToday && !isSel && !isBlocked) border = `2px solid ${th.primary}70`
 
           return (
             <button key={ds} type="button" disabled={!isAvail} onClick={() => isAvail && onSelect(ds)}
@@ -909,7 +936,10 @@ function CalPicker({ avail, selDate, calView, canPrev, canNext, onSelect, onPrev
               onMouseEnter={e=>{if(isAvail&&!isSel){e.currentTarget.style.background=th.pale;e.currentTarget.style.transform='scale(1.07)';e.currentTarget.style.boxShadow=`0 2px 8px ${th.primary}25`}}}
               onMouseLeave={e=>{if(isAvail&&!isSel){e.currentTarget.style.background=th.glow;e.currentTarget.style.transform='scale(1)';e.currentTarget.style.boxShadow='none'}}}>
               {d.getDate()}
-              {isToday && (
+              {isBlocked && (
+                <span style={{ position:'absolute', bottom:'8%', fontSize:'clamp(6px,1.5vw,8px)' }}>🚫</span>
+              )}
+              {isToday && !isBlocked && (
                 <span style={{ position:'absolute', bottom:'12%', width:4, height:4, borderRadius:'50%', background:isSel?'rgba(255,255,255,0.8)':th.primary }}/>
               )}
             </button>
@@ -920,8 +950,9 @@ function CalPicker({ avail, selDate, calView, canPrev, canNext, onSelect, onPrev
       {/* Legend */}
       <div style={{ display:'flex', gap:'10px 20px', justifyContent:'center', flexWrap:'wrap', marginTop:16 }}>
         {[
-          { bg: th.primary, bd: th.primary, label: 'Selecionado', textCol: '#fff' },
-          { bg: th.glow,    bd: th.pale,    label: 'Disponível',   textCol: th.primary },
+          { bg: th.primary,  bd: th.primary,  label: 'Selecionado',  textCol: '#fff' },
+          { bg: th.glow,     bd: th.pale,     label: 'Disponível',    textCol: th.primary },
+          { bg: '#FEF2F2',   bd: '#FECACA',   label: 'Bloqueado',     textCol: '#FCA5A5' },
           { bg: 'transparent', bd: 'transparent', label: 'Indisponível', textCol: '#C0B8AE' },
         ].map(({ bg, bd, label, textCol }) => (
           <div key={label} style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:T.muted }}>
