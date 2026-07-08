@@ -145,19 +145,16 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
   const dayAvail = selDate ? avail.find(a=>a.day_of_week===new Date(selDate+'T12:00').getDay()) : null
   const slots    = dayAvail ? genSlots(dayAvail.start_time, dayAvail.end_time, dayAvail.slot_minutes) : []
 
-  // Calendar month navigation — max 2 months (current + next)
+  // Calendar month navigation — no upper limit, cannot go before current month
   const _now = new Date()
   const _curY = _now.getFullYear(), _curM = _now.getMonth()
-  const _maxY = _curM === 11 ? _curY + 1 : _curY
-  const _maxM = (_curM + 1) % 12
   const canGoPrev = calView.year > _curY || calView.month > _curM
-  const canGoNext = calView.year < _maxY || (calView.year === _maxY && calView.month < _maxM)
+  const canGoNext = true
   function prevMonth() {
     if (!canGoPrev) return
     setCalView(v => v.month === 0 ? { year: v.year-1, month: 11 } : { year: v.year, month: v.month-1 })
   }
   function nextMonth() {
-    if (!canGoNext) return
     setCalView(v => v.month === 11 ? { year: v.year+1, month: 0 } : { year: v.year, month: v.month+1 })
   }
 
