@@ -46,6 +46,20 @@ export type Appointment = {
   notes: string | null
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed'
   notified_wpp: boolean
+  confirmed_at: string | null
+  created_at: string
+}
+
+export type NotificationLog = {
+  id: string
+  appointment_id: string | null
+  professional_id: string | null
+  channel: 'email' | 'whatsapp'
+  recipient: string
+  event_type: string
+  status: 'sent' | 'failed' | 'skipped'
+  error_message: string | null
+  metadata: Record<string, unknown>
   created_at: string
 }
 

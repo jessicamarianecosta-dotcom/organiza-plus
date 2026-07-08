@@ -193,14 +193,26 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
     })
     if (!error) {
       track(profile.id, 'booking_completed')
+
+      // Notify professional via WhatsApp about new booking
       if (profile.whatsapp) {
         fetch('/api/whatsapp', { method:'POST', headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({ professional_phone:profile.whatsapp, professional_name:profile.name, client_name:clientName, client_phone:clientPhone, appt_date:selDate, appt_time:selTime }) })
+          body:JSON.stringify({ type:'new_booking', professional_phone:profile.whatsapp, professional_name:profile.name, client_name:clientName, client_phone:clientPhone, appt_date:selDate, appt_time:selTime }) })
       }
-      if (clientEmail) {
+
+      // Notify professional via email about new booking
+      if ((profile as any).email) {
         fetch('/api/email', { method:'POST', headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({ type:'confirmation', to:clientEmail, client:clientName, professional:profile.name, date:selDate, time:selTime }) })
+          body:JSON.stringify({ type:'new_booking', to:(profile as any).email, client:clientName, phone:clientPhone, date:selDate, time:selTime, notes:notes||undefined }) })
       }
+
+      // Notify client that booking was received (awaiting confirmation — NOT confirmed yet)
+      if (clientEmail) {
+        const modality = profile.online && !profile.in_person ? 'Online' : !profile.online && profile.in_person ? 'Presencial' : 'Online ou Presencial'
+        fetch('/api/email', { method:'POST', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({ type:'booking_received', to:clientEmail, client:clientName, professional:profile.name, date:selDate, time:selTime, modality }) })
+      }
+
       setStep('done')
     } else {
       setBookError('Não foi possível confirmar o agendamento. Tente novamente ou entre em contato pelo WhatsApp.')

@@ -48,6 +48,7 @@ function DashboardContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [toast, setToast] = useState('')
   const [hasSchedule, setHasSchedule] = useState(false)
+  const [notifErrors, setNotifErrors] = useState<Record<string, string>>({}) // appointmentId → error msg
 
   const load = useCallback(async () => {
     try {
@@ -73,8 +74,72 @@ function DashboardContent() {
   useEffect(() => { load() }, [load])
 
   async function updateStatus(id: string, status: string) {
-    await supabase.from('appointments').update({status}).eq('id',id)
+    const updates: Record<string, unknown> = { status }
+    if (status === 'confirmed') updates.confirmed_at = new Date().toISOString()
+    await supabase.from('appointments').update(updates).eq('id', id)
     setAppointments(prev => prev.map(a => a.id===id ? {...a, status: status as any} : a))
+
+    if (status === 'confirmed') {
+      const appt = appointments.find(a => a.id === id)
+      if (!appt || !profile) return
+
+      const modality = profile.online && !profile.in_person ? 'Online'
+        : !profile.online && profile.in_person ? 'Presencial' : 'Online ou Presencial'
+
+      const errors: string[] = []
+
+      // Send confirmation email to client
+      if (appt.client_email) {
+        const emailRes = await fetch('/api/email', { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            type: 'appointment_confirmed',
+            to: appt.client_email,
+            appointment_id: id,
+            professional_id: profile.id,
+            client: appt.client_name,
+            professional: profile.name,
+            date: appt.appt_date,
+            time: appt.appt_time.slice(0,5),
+            modality,
+          })
+        })
+        const emailData = await emailRes.json()
+        if (!emailData.ok) errors.push(`E-mail: ${emailData.error || 'falha'}`)
+      }
+
+      // Send WhatsApp confirmation to client
+      if (appt.client_phone) {
+        const wppRes = await fetch('/api/whatsapp', { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            type: 'confirmed',
+            appointment_id: id,
+            professional_id: profile.id,
+            professional_name: profile.name,
+            client_name: appt.client_name,
+            client_phone: appt.client_phone,
+            appt_date: appt.appt_date,
+            appt_time: appt.appt_time.slice(0,5),
+            modality,
+          })
+        })
+        const wppData = await wppRes.json()
+        if (!wppData.sent && process.env.NEXT_PUBLIC_WPP_ENABLED === 'true') {
+          errors.push(`WhatsApp: ${wppData.error || 'não enviado'}`)
+        }
+      }
+
+      if (errors.length > 0) {
+        setNotifErrors(prev => ({ ...prev, [id]: errors.join(' · ') }))
+      } else {
+        setNotifErrors(prev => { const n = {...prev}; delete n[id]; return n })
+        setToast('✅ Consulta confirmada e paciente notificado!')
+      }
+    }
+  }
+
+  async function retryNotification(id: string) {
+    setNotifErrors(prev => { const n = {...prev}; delete n[id]; return n })
+    await updateStatus(id, 'confirmed')
   }
 
   async function logout() { await supabase.auth.signOut(); router.push('/') }
@@ -304,20 +369,28 @@ function DashboardContent() {
                                 <div style={{ width:40, height:40, borderRadius:'50%', background:sc.bg, border:`2.5px solid ${sc.color}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, zIndex:1, position:'relative' }}>
                                   <span style={{ fontSize:10, fontWeight:800, color:sc.color, textAlign:'center', lineHeight:1 }}>{a.appt_time.slice(0,5)}</span>
                                 </div>
-                                <div style={{ flex:1, background:T.off, borderRadius:T.r14, padding:'10px 14px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-                                  <div style={{ flex:1, minWidth:0 }}>
-                                    <p style={{ fontWeight:700, fontSize:14, color:T.dark, margin:0 }}>{a.client_name}</p>
-                                    <p style={{ fontSize:11, color:T.muted, margin:0 }}>{a.client_phone}</p>
-                                  </div>
-                                  <span style={{ fontSize:10, fontWeight:700, padding:'3px 9px', borderRadius:T.r100, background:sc.bg, color:sc.color, flexShrink:0 }}>{sc.label}</span>
-                                  {a.status==='pending' && (
-                                    <div style={{ display:'flex', gap:5, flexShrink:0 }}>
-                                      <button onClick={()=>updateStatus(a.id,'confirmed')} style={{ background:T.sage, color:T.cream, border:'none', borderRadius:T.r8, padding:'5px 10px', cursor:'pointer', fontSize:12, fontWeight:600 }}>✓</button>
-                                      <button onClick={()=>updateStatus(a.id,'cancelled')} style={{ background:T.redL, color:T.red, border:'none', borderRadius:T.r8, padding:'5px 10px', cursor:'pointer', fontSize:12, fontWeight:600 }}>✗</button>
+                                <div style={{ flex:1, minWidth:0, display:'flex', flexDirection:'column', gap:6 }}>
+                                  <div style={{ background:T.off, borderRadius:T.r14, padding:'10px 14px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                                    <div style={{ flex:1, minWidth:0 }}>
+                                      <p style={{ fontWeight:700, fontSize:14, color:T.dark, margin:0 }}>{a.client_name}</p>
+                                      <p style={{ fontSize:11, color:T.muted, margin:0 }}>{a.client_phone}</p>
                                     </div>
-                                  )}
-                                  {a.status==='confirmed' && (
-                                    <button onClick={()=>updateStatus(a.id,'completed')} style={{ background:T.blueL, color:T.blue, border:'none', borderRadius:T.r8, padding:'5px 10px', cursor:'pointer', fontSize:11, fontWeight:600, flexShrink:0 }}>Concluir</button>
+                                    <span style={{ fontSize:10, fontWeight:700, padding:'3px 9px', borderRadius:T.r100, background:sc.bg, color:sc.color, flexShrink:0 }}>{sc.label}</span>
+                                    {a.status==='pending' && (
+                                      <div style={{ display:'flex', gap:5, flexShrink:0 }}>
+                                        <button onClick={()=>updateStatus(a.id,'confirmed')} style={{ background:T.sage, color:T.cream, border:'none', borderRadius:T.r8, padding:'5px 10px', cursor:'pointer', fontSize:12, fontWeight:600 }}>✓ Confirmar</button>
+                                        <button onClick={()=>updateStatus(a.id,'cancelled')} style={{ background:T.redL, color:T.red, border:'none', borderRadius:T.r8, padding:'5px 10px', cursor:'pointer', fontSize:12, fontWeight:600 }}>✗</button>
+                                      </div>
+                                    )}
+                                    {a.status==='confirmed' && (
+                                      <button onClick={()=>updateStatus(a.id,'completed')} style={{ background:T.blueL, color:T.blue, border:'none', borderRadius:T.r8, padding:'5px 10px', cursor:'pointer', fontSize:11, fontWeight:600, flexShrink:0 }}>Concluir</button>
+                                    )}
+                                  </div>
+                                  {notifErrors[a.id] && (
+                                    <div style={{ padding:'8px 12px', background:'#FEF2F2', border:'1px solid #FECACA', borderRadius:T.r10, fontSize:12, color:'#DC2626', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+                                      <span>⚠ Falha ao notificar: {notifErrors[a.id]}</span>
+                                      <button onClick={()=>retryNotification(a.id)} style={{ background:T.red, color:'#fff', border:'none', borderRadius:T.r8, padding:'4px 10px', cursor:'pointer', fontSize:11, fontWeight:700, flexShrink:0 }}>Tentar novamente</button>
+                                    </div>
                                   )}
                                 </div>
                               </div>
