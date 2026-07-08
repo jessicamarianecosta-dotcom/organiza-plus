@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { T, GlobalStyles } from '@/lib/ds'
-import { ChevronLeft, ChevronRight, Plus, Check, Trash2, Bell, FileText, Clock, ArrowLeft, Flag, X, Edit2, Save } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Check, Trash2, Bell, FileText, Clock, ArrowLeft, Flag, X, Edit2, Save, Search } from 'lucide-react'
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameMonth, isSameDay, isToday, parseISO, isBefore } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -26,11 +26,11 @@ const NOTE_COLORS: Record<string,{bg:string,border:string,text:string}> = {
   purple: { bg:'#F5F3FF', border:'#DDD6FE', text:'#4c1d95' },
 }
 
-function FI({ value, set, placeholder, type='text', style={} }: any) {
+function FI({ value, set, placeholder, type='text', style={}, onKeyDown }: any) {
   const [f,setF]=useState(false)
   return <input type={type} value={value} onChange={e=>set(e.target.value)} placeholder={placeholder}
     style={{ padding:'9px 12px', fontSize:13, color:T.dark, background:T.off, border:`1.5px solid ${f?T.sage:T.nude}`, borderRadius:T.r10, outline:'none', fontFamily:T.fontSans, transition:'border-color 0.15s', ...style }}
-    onFocus={()=>setF(true)} onBlur={()=>setF(false)}/>
+    onFocus={()=>setF(true)} onBlur={()=>setF(false)} onKeyDown={onKeyDown}/>
 }
 
 export default function AgendaPage() {
@@ -44,7 +44,7 @@ export default function AgendaPage() {
   const [notes, setNotes]     = useState<Note[]>([])
   const [reminders, setRem]   = useState<Reminder[]>([])
   const [selDay, setSelDay]   = useState<Date|null>(new Date())
-  const [tab, setTab]         = useState<'tarefas'|'notas'|'lembretes'>('tarefas')
+  const [search, setSearch]   = useState('')
   const [newTask, setNewTask] = useState('')
   const [taskPrio, setTaskPrio] = useState<'low'|'normal'|'high'>('normal')
   const [taskDue, setTaskDue]   = useState('')
@@ -131,9 +131,25 @@ export default function AgendaPage() {
   }
   const calDays = buildCalDays()
   const selDayAppts = selDay ? getDayAppts(selDay) : []
-  const pendingTasks = tasks.filter(t=>!t.done)
-  const doneTasks    = tasks.filter(t=>t.done)
-  const urgentRem    = reminders.filter(r=>!r.done && isBefore(parseISO(r.remind_at), addDays(new Date(),2)))
+
+  const q = search.toLowerCase().trim()
+  const todayStr = format(new Date(), 'yyyy-MM-dd')
+
+  const filteredTasks = tasks.filter(t => !q || t.title.toLowerCase().includes(q))
+  const sortedPendingTasks = filteredTasks.filter(t=>!t.done).sort((a,b)=>{
+    const pa = a.priority==='high'?0:a.priority==='normal'?1:2
+    const pb = b.priority==='high'?0:b.priority==='normal'?1:2
+    if (pa!==pb) return pa-pb
+    if (a.due_date===todayStr && b.due_date!==todayStr) return -1
+    if (b.due_date===todayStr && a.due_date!==todayStr) return 1
+    if (a.due_date&&b.due_date) return a.due_date.localeCompare(b.due_date)
+    if (a.due_date) return -1; if (b.due_date) return 1; return 0
+  })
+  const doneTasks     = filteredTasks.filter(t=>t.done)
+  const pendingTasks  = tasks.filter(t=>!t.done)
+  const filteredNotes = notes.filter(n => !q || n.content.toLowerCase().includes(q))
+  const filteredRem   = reminders.filter(r => !q || r.title.toLowerCase().includes(q))
+  const urgentRem     = reminders.filter(r=>!r.done && isBefore(parseISO(r.remind_at), addDays(new Date(),2)))
 
   if (loading) return (
     <div style={{ minHeight:'100vh', background:T.off, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:T.fontSans }}>
@@ -281,187 +297,210 @@ export default function AgendaPage() {
 
           {/* ── WORKSPACE SIDEBAR ── */}
           <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            {/* Tab switcher */}
-            <div style={{ background:T.white, borderRadius:T.r16, padding:4, display:'flex', gap:2, boxShadow:T.shadowCard }}>
-              {([
-                { id:'tarefas' as const,   icon:'✓',  label:'Tarefas' },
-                { id:'notas' as const,     icon:'📝', label:'Notas' },
-                { id:'lembretes' as const, icon:'🔔', label:'Lembretes' },
-              ]).map(t=>(
-                <button key={t.id} onClick={()=>setTab(t.id)}
-                  style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:5, padding:'9px 6px', borderRadius:T.r12, border:'none', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:T.fontSans, transition:'all 0.15s', background:tab===t.id?T.sage:'transparent', color:tab===t.id?T.cream:T.muted }}>
-                  <span>{t.icon}</span> {t.label}
-                </button>
-              ))}
+
+            {/* Search */}
+            <div style={{ background:T.white, borderRadius:T.r16, padding:'9px 14px', boxShadow:T.shadowCard, display:'flex', alignItems:'center', gap:8 }}>
+              <Search size={14} style={{color:T.muted, flexShrink:0}}/>
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Pesquisar tarefas, notas e lembretes..."
+                style={{ flex:1, background:'none', border:'none', outline:'none', fontSize:13, color:T.dark, fontFamily:T.fontSans }}/>
+              {search && (
+                <button onClick={()=>setSearch('')} style={{ background:'none', border:'none', cursor:'pointer', color:T.muted, display:'flex', padding:2 }}><X size={12}/></button>
+              )}
             </div>
 
-            {/* TAREFAS */}
-            {tab==='tarefas' && (
-              <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, overflow:'hidden' }} className="fade">
-                <div style={{ padding:'16px 18px', borderBottom:`1px solid ${T.nude}` }}>
-                  <h3 style={{ fontFamily:T.fontSerif, fontSize:16, color:T.dark, margin:'0 0 12px', display:'flex', alignItems:'center', gap:7 }}>
-                    <Check size={15} style={{color:T.sage}}/> Tarefas
-                  </h3>
-                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                    <FI value={newTask} set={setNewTask} placeholder="Nova tarefa..." style={{ width:'100%' }}/>
-                    <div style={{ display:'flex', gap:8 }}>
-                      <select value={taskPrio} onChange={e=>setTaskPrio(e.target.value as any)} style={{ flex:1, padding:'8px 10px', fontSize:12, color:T.dark, background:T.off, border:`1.5px solid ${T.nude}`, borderRadius:T.r10, outline:'none', fontFamily:T.fontSans, cursor:'pointer' }}>
-                        <option value="low">🔵 Baixa</option>
-                        <option value="normal">🟢 Normal</option>
-                        <option value="high">🔴 Alta</option>
-                      </select>
-                      <FI value={taskDue} set={setTaskDue} type="date" style={{ flex:1 }}/>
-                    </div>
-                    <button onClick={addTask} disabled={!newTask.trim()} style={{ width:'100%', padding:'9px', background:T.sage, color:T.cream, border:'none', borderRadius:T.r10, fontSize:13, fontWeight:700, cursor:newTask.trim()?'pointer':'not-allowed', fontFamily:T.fontSans, display:'flex', alignItems:'center', justifyContent:'center', gap:5, opacity:newTask.trim()?1:0.45, transition:'background 0.15s' }}
-                      onMouseEnter={e=>{if(newTask.trim())e.currentTarget.style.background=T.mid}} onMouseLeave={e=>{if(newTask.trim())e.currentTarget.style.background=T.sage}}>
-                      <Plus size={14}/> Adicionar
-                    </button>
-                  </div>
-                </div>
-                <div style={{ maxHeight:460, overflowY:'auto' }}>
-                  {tasks.length===0 && <div style={{ padding:'32px', textAlign:'center', color:T.muted }}><div style={{ fontSize:32, marginBottom:8 }}>✅</div><p style={{ fontSize:13 }}>Nenhuma tarefa.</p></div>}
-                  {pendingTasks.map(t=>(
-                    <div key={t.id} style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'11px 18px', borderBottom:`1px solid ${T.nude}`, transition:'background 0.12s' }} className="task-row"
-                      onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.background=`${T.sageG}50`}} onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.background='transparent'}}>
-                      <button onClick={()=>toggleTask(t.id,true)} style={{ width:20,height:20,borderRadius:6,border:`2px solid ${T.nude}`,background:'white',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,marginTop:2,transition:'all 0.15s' }}
-                        onMouseEnter={e=>{e.currentTarget.style.borderColor=T.sage}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.nude}}/>
-                      <div style={{ flex:1, minWidth:0 }}>
-                        {editId===t.id ? (
-                          <div style={{ display:'flex', gap:5 }}>
-                            <input value={editText} onChange={e=>setEditText(e.target.value)} autoFocus style={{ flex:1, padding:'5px 8px', fontSize:13, color:T.dark, background:T.off, border:`1.5px solid ${T.sage}`, borderRadius:T.r8, outline:'none', fontFamily:T.fontSans }}/>
-                            <button onClick={()=>saveEditTask(t.id)} style={{ background:T.sage,color:'white',border:'none',borderRadius:T.r8,padding:'5px 8px',cursor:'pointer' }}><Save size={12}/></button>
-                            <button onClick={()=>setEditId(null)} style={{ background:T.off,color:T.muted,border:`1px solid ${T.nude}`,borderRadius:T.r8,padding:'5px 8px',cursor:'pointer' }}><X size={12}/></button>
-                          </div>
-                        ) : (
-                          <>
-                            <p style={{ fontSize:13,fontWeight:500,color:T.dark,margin:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{t.title}</p>
-                            <div style={{ display:'flex',gap:7,marginTop:3,flexWrap:'wrap' }}>
-                              <span style={{ fontSize:9,fontWeight:700,padding:'2px 6px',borderRadius:T.r100,background:PRIORITY_MAP[t.priority].bg,color:PRIORITY_MAP[t.priority].color }}><Flag size={7} style={{display:'inline',marginRight:2}}/>{PRIORITY_MAP[t.priority].label}</span>
-                              {t.due_date && <span style={{ fontSize:9,color:T.muted,fontWeight:500 }}>📅 {format(parseISO(t.due_date+'T12:00'),'dd/MM')}</span>}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                      {editId!==t.id && (
-                        <div style={{ display:'flex',gap:3,opacity:0,transition:'opacity 0.15s' }} className="task-actions">
-                          <button onClick={()=>{setEditId(t.id);setEditText(t.title)}} style={{ background:'none',border:'none',cursor:'pointer',color:T.muted,padding:2,display:'flex' }}><Edit2 size={11}/></button>
-                          <button onClick={()=>deleteTask(t.id)} style={{ background:'none',border:'none',cursor:'pointer',color:T.muted,padding:2,display:'flex' }} onMouseEnter={e=>e.currentTarget.style.color='#ef4444'} onMouseLeave={e=>e.currentTarget.style.color=T.muted}><Trash2 size={11}/></button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  {doneTasks.length>0 && (
-                    <>
-                      <div style={{ padding:'8px 18px 4px', fontSize:10, fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.07em' }}>Concluídas ({doneTasks.length})</div>
-                      {doneTasks.map(t=>(
-                        <div key={t.id} style={{ display:'flex',alignItems:'center',gap:10,padding:'10px 18px',borderBottom:`1px solid ${T.nude}`,opacity:0.55 }}>
-                          <button onClick={()=>toggleTask(t.id,false)} style={{ width:20,height:20,borderRadius:6,border:`2px solid ${T.sage}`,background:T.sage,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,transition:'all 0.15s' }}>
-                            <Check size={10} color="white" strokeWidth={3}/>
-                          </button>
-                          <p style={{ flex:1,fontSize:13,color:T.muted,margin:0,textDecoration:'line-through',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{t.title}</p>
-                          <button onClick={()=>deleteTask(t.id)} style={{ background:'none',border:'none',cursor:'pointer',color:T.nude,padding:2,display:'flex' }}><Trash2 size={11}/></button>
-                        </div>
-                      ))}
-                    </>
-                  )}
-                </div>
+            {/* ─── TAREFAS ─── */}
+            <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, overflow:'hidden' }}>
+              <div style={{ padding:'12px 18px', borderBottom:`1px solid ${T.nude}`, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <h3 style={{ fontFamily:T.fontSerif, fontSize:15, color:T.dark, margin:0, display:'flex', alignItems:'center', gap:7 }}>
+                  <Check size={14} style={{color:T.sage}}/> Tarefas
+                </h3>
+                <span style={{ background:T.sageG, color:T.sage, border:`1px solid ${T.sageP}`, fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:T.r100 }}>{tasks.length}</span>
               </div>
-            )}
-
-            {/* NOTAS */}
-            {tab==='notas' && (
-              <div className="fade">
-                <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:'16px 18px', marginBottom:12 }}>
-                  <h3 style={{ fontFamily:T.fontSerif, fontSize:16, color:T.dark, margin:'0 0 12px', display:'flex', alignItems:'center', gap:7 }}>
-                    📝 {editNoteId?'Editar nota':'Nova nota'}
-                  </h3>
-                  <textarea rows={4} value={noteText} onChange={e=>setNoteText(e.target.value)} placeholder="Anotação rápida..."
-                    style={{ width:'100%', padding:'10px 12px', fontSize:13, color:T.dark, background:T.off, border:`1.5px solid ${T.nude}`, borderRadius:T.r12, outline:'none', resize:'vertical', fontFamily:T.fontSans, marginBottom:10, transition:'border-color 0.15s' }}
-                    onFocus={e=>e.target.style.borderColor=T.sage} onBlur={e=>e.target.style.borderColor=T.nude}/>
-                  <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
-                    <span style={{ fontSize:11, color:T.muted, fontWeight:600 }}>Cor:</span>
-                    {Object.entries(NOTE_COLORS).map(([k,v])=>(
-                      <button key={k} type="button" onClick={()=>setNoteColor(k)} style={{ width:22,height:22,borderRadius:'50%',background:v.bg,border:`2px solid ${noteColor===k?T.sage:v.border}`,cursor:'pointer',transition:'transform 0.15s',transform:noteColor===k?'scale(1.2)':'scale(1)' }}/>
-                    ))}
+              <div style={{ padding:'12px 18px', borderBottom:`1px solid ${T.nude}` }}>
+                <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
+                  <FI value={newTask} set={setNewTask} placeholder="Nova tarefa..." style={{ width:'100%' }} onKeyDown={(e:any)=>e.key==='Enter'&&addTask()}/>
+                  <div style={{ display:'flex', gap:7 }}>
+                    <select value={taskPrio} onChange={e=>setTaskPrio(e.target.value as any)} style={{ flex:1, padding:'7px 10px', fontSize:12, color:T.dark, background:T.off, border:`1.5px solid ${T.nude}`, borderRadius:T.r10, outline:'none', fontFamily:T.fontSans, cursor:'pointer' }}>
+                      <option value="low">🔵 Baixa</option>
+                      <option value="normal">🟢 Normal</option>
+                      <option value="high">🔴 Alta</option>
+                    </select>
+                    <FI value={taskDue} set={setTaskDue} type="date" style={{ flex:1 }}/>
                   </div>
-                  <div style={{ display:'flex', gap:8 }}>
-                    {editNoteId && <button onClick={()=>{setEditNoteId(null);setNoteText('');setNoteColor('sage')}} style={{ padding:'8px 12px', background:'transparent', border:`1.5px solid ${T.nude}`, borderRadius:T.r10, fontSize:12, fontWeight:600, cursor:'pointer', color:T.muted, fontFamily:T.fontSans }}>Cancelar</button>}
-                    <button onClick={saveNote} disabled={!noteText.trim()} style={{ flex:1, padding:'9px', background:T.sage, color:T.cream, border:'none', borderRadius:T.r10, fontSize:13, fontWeight:700, cursor:noteText.trim()?'pointer':'not-allowed', fontFamily:T.fontSans, opacity:noteText.trim()?1:0.45, transition:'background 0.15s' }}
-                      onMouseEnter={e=>{if(noteText.trim())e.currentTarget.style.background=T.mid}} onMouseLeave={e=>{if(noteText.trim())e.currentTarget.style.background=T.sage}}>
-                      {editNoteId ? '💾 Salvar' : '+ Adicionar'}
-                    </button>
-                  </div>
-                </div>
-                {notes.length===0 ? (
-                  <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:'36px', textAlign:'center' }}>
-                    <div style={{ fontSize:32, marginBottom:8 }}>📝</div>
-                    <p style={{ fontSize:13, color:T.muted }}>Nenhuma nota ainda.</p>
-                  </div>
-                ) : (
-                  <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                    {notes.map(n=>{
-                      const c = NOTE_COLORS[n.color]||NOTE_COLORS.sage
-                      return (
-                        <div key={n.id} style={{ background:c.bg, border:`1px solid ${c.border}`, borderRadius:T.r16, padding:'14px 16px', boxShadow:T.shadowSm }}>
-                          <p style={{ fontSize:13, color:c.text, lineHeight:1.65, margin:'0 0 8px', whiteSpace:'pre-wrap', wordBreak:'break-word' }}>{n.content}</p>
-                          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                            <span style={{ fontSize:10, color:`${c.text}55`, fontWeight:500 }}>{format(parseISO(n.updated_at),'dd/MM HH:mm')}</span>
-                            <div style={{ display:'flex', gap:5 }}>
-                              <button onClick={()=>startEditNote(n)} style={{ background:'none',border:'none',cursor:'pointer',color:`${c.text}55`,padding:2,display:'flex' }}><Edit2 size={12}/></button>
-                              <button onClick={()=>deleteNote(n.id)} style={{ background:'none',border:'none',cursor:'pointer',color:`${c.text}55`,padding:2,display:'flex' }}><Trash2 size={12}/></button>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* LEMBRETES */}
-            {tab==='lembretes' && (
-              <div className="fade">
-                <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:'16px 18px', marginBottom:12 }}>
-                  <h3 style={{ fontFamily:T.fontSerif, fontSize:16, color:T.dark, margin:'0 0 12px', display:'flex', alignItems:'center', gap:7 }}>
-                    <Bell size={15} style={{color:T.sage}}/> Novo lembrete
-                  </h3>
-                  <FI value={remTitle} set={setRemTitle} placeholder="Ex: Ligar para paciente Maria" style={{ width:'100%', marginBottom:8 }}/>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
-                    <FI value={remDate} set={setRemDate} type="date" style={{ width:'100%' }}/>
-                    <FI value={remTime} set={setRemTime} type="time" style={{ width:'100%' }}/>
-                  </div>
-                  <button onClick={addReminder} disabled={!remTitle.trim()||!remDate||!remTime} style={{ width:'100%', padding:'9px', background:T.sage, color:T.cream, border:'none', borderRadius:T.r10, fontSize:13, fontWeight:700, cursor:(remTitle.trim()&&remDate&&remTime)?'pointer':'not-allowed', fontFamily:T.fontSans, display:'flex', alignItems:'center', justifyContent:'center', gap:5, opacity:(remTitle.trim()&&remDate&&remTime)?1:0.45, transition:'background 0.15s' }}
-                    onMouseEnter={e=>{if(remTitle.trim()&&remDate&&remTime)e.currentTarget.style.background=T.mid}} onMouseLeave={e=>{if(remTitle.trim()&&remDate&&remTime)e.currentTarget.style.background=T.sage}}>
-                    <Plus size={14}/> Adicionar lembrete
+                  <button onClick={addTask} disabled={!newTask.trim()}
+                    style={{ width:'100%', padding:'8px', background:T.sage, color:T.cream, border:'none', borderRadius:T.r10, fontSize:12, fontWeight:700, cursor:newTask.trim()?'pointer':'not-allowed', fontFamily:T.fontSans, display:'flex', alignItems:'center', justifyContent:'center', gap:5, opacity:newTask.trim()?1:0.45 }}>
+                    <Plus size={13}/> Adicionar tarefa
                   </button>
                 </div>
-                <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, overflow:'hidden' }}>
-                  {reminders.length===0 ? (
-                    <div style={{ padding:'36px', textAlign:'center' }}><div style={{ fontSize:32, marginBottom:8 }}>🔔</div><p style={{ fontSize:13, color:T.muted }}>Nenhum lembrete.</p></div>
-                  ) : reminders.map(r=>{
-                    const dt = parseISO(r.remind_at)
-                    const over = isBefore(dt,new Date())&&!r.done
-                    const urg  = isBefore(dt,addDays(new Date(),2))&&!r.done
-                    return (
-                      <div key={r.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 18px', borderBottom:`1px solid ${T.nude}`, opacity:r.done?0.45:1, background:over?'#fef2f208':'transparent' }}>
-                        <button onClick={()=>toggleReminder(r.id,!r.done)} style={{ width:20,height:20,borderRadius:'50%',border:`2px solid ${r.done?T.sage:urg?'#e05252':T.nude}`,background:r.done?T.sage:'white',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,transition:'all 0.15s' }}>
-                          {r.done&&<Check size={10} color="white" strokeWidth={3}/>}
-                        </button>
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <p style={{ fontWeight:600, fontSize:13, color:T.dark, margin:0, textDecoration:r.done?'line-through':'none', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.title}</p>
-                          <p style={{ fontSize:10, color:over?'#e05252':T.muted, margin:0, display:'flex', alignItems:'center', gap:3 }}>
-                            <Clock size={9}/> {format(dt,"dd/MM 'às' HH:mm")}
-                            {over&&!r.done&&<span style={{ color:'#e05252', fontWeight:700 }}> · Vencido</span>}
-                          </p>
+              </div>
+              <div style={{ maxHeight:320, overflowY:'auto' }}>
+                {sortedPendingTasks.length===0 && doneTasks.length===0 && (
+                  <div style={{ padding:'28px', textAlign:'center', color:T.muted }}>
+                    {q ? <p style={{ fontSize:13, margin:0 }}>Nenhuma tarefa para "{search}"</p> : <><div style={{ fontSize:28, marginBottom:6 }}>✅</div><p style={{ fontSize:13, margin:0 }}>Nenhuma tarefa ainda.</p></>}
+                  </div>
+                )}
+                {sortedPendingTasks.map(t=>(
+                  <div key={t.id} style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'10px 18px', borderBottom:`1px solid ${T.nude}`, transition:'background 0.12s' }} className="task-row"
+                    onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.background=`${T.sageG}50`}} onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.background='transparent'}}>
+                    <button onClick={()=>toggleTask(t.id,true)} style={{ width:18,height:18,borderRadius:5,border:`2px solid ${T.nude}`,background:'white',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,marginTop:2,transition:'all 0.15s' }}
+                      onMouseEnter={e=>e.currentTarget.style.borderColor=T.sage} onMouseLeave={e=>e.currentTarget.style.borderColor=T.nude}/>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      {editId===t.id ? (
+                        <div style={{ display:'flex', gap:5 }}>
+                          <input value={editText} onChange={e=>setEditText(e.target.value)} autoFocus
+                            onKeyDown={e=>{if(e.key==='Enter')saveEditTask(t.id);if(e.key==='Escape')setEditId(null)}}
+                            style={{ flex:1, padding:'4px 8px', fontSize:12, color:T.dark, background:T.off, border:`1.5px solid ${T.sage}`, borderRadius:T.r8, outline:'none', fontFamily:T.fontSans }}/>
+                          <button onClick={()=>saveEditTask(t.id)} style={{ background:T.sage,color:'white',border:'none',borderRadius:T.r8,padding:'4px 7px',cursor:'pointer' }}><Save size={11}/></button>
+                          <button onClick={()=>setEditId(null)} style={{ background:T.off,color:T.muted,border:`1px solid ${T.nude}`,borderRadius:T.r8,padding:'4px 7px',cursor:'pointer' }}><X size={11}/></button>
                         </div>
-                        <button onClick={()=>deleteReminder(r.id)} style={{ background:'none',border:'none',cursor:'pointer',color:T.nude,padding:2,display:'flex',transition:'color 0.15s' }} onMouseEnter={e=>e.currentTarget.style.color='#ef4444'} onMouseLeave={e=>e.currentTarget.style.color=T.nude}><Trash2 size={12}/></button>
+                      ) : (
+                        <>
+                          <p style={{ fontSize:13,fontWeight:500,color:T.dark,margin:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{t.title}</p>
+                          <div style={{ display:'flex',gap:6,marginTop:2,flexWrap:'wrap' }}>
+                            <span style={{ fontSize:9,fontWeight:700,padding:'2px 6px',borderRadius:T.r100,background:PRIORITY_MAP[t.priority].bg,color:PRIORITY_MAP[t.priority].color }}><Flag size={7} style={{display:'inline',marginRight:2}}/>{PRIORITY_MAP[t.priority].label}</span>
+                            {t.due_date && <span style={{ fontSize:9,color:t.due_date===todayStr?T.sage:T.muted,fontWeight:500 }}>📅 {t.due_date===todayStr?'Hoje':format(parseISO(t.due_date+'T12:00'),'dd/MM')}</span>}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    {editId!==t.id && (
+                      <div style={{ display:'flex',gap:3,opacity:0,transition:'opacity 0.15s' }} className="task-actions">
+                        <button onClick={()=>{setEditId(t.id);setEditText(t.title)}} style={{ background:'none',border:'none',cursor:'pointer',color:T.muted,padding:2,display:'flex' }}><Edit2 size={11}/></button>
+                        <button onClick={()=>deleteTask(t.id)} style={{ background:'none',border:'none',cursor:'pointer',color:T.muted,padding:2,display:'flex' }} onMouseEnter={e=>e.currentTarget.style.color='#ef4444'} onMouseLeave={e=>e.currentTarget.style.color=T.muted}><Trash2 size={11}/></button>
                       </div>
-                    )
-                  })}
+                    )}
+                  </div>
+                ))}
+                {doneTasks.length>0 && (
+                  <>
+                    <div style={{ padding:'7px 18px 3px', fontSize:10, fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.07em' }}>Concluídas ({doneTasks.length})</div>
+                    {doneTasks.map(t=>(
+                      <div key={t.id} style={{ display:'flex',alignItems:'center',gap:10,padding:'9px 18px',borderBottom:`1px solid ${T.nude}`,opacity:0.5 }}>
+                        <button onClick={()=>toggleTask(t.id,false)} style={{ width:18,height:18,borderRadius:5,border:`2px solid ${T.sage}`,background:T.sage,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0 }}>
+                          <Check size={9} color="white" strokeWidth={3}/>
+                        </button>
+                        <p style={{ flex:1,fontSize:12,color:T.muted,margin:0,textDecoration:'line-through',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{t.title}</p>
+                        <button onClick={()=>deleteTask(t.id)} style={{ background:'none',border:'none',cursor:'pointer',color:T.nude,padding:2,display:'flex' }}><Trash2 size={11}/></button>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* ─── NOTAS ─── */}
+            <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, overflow:'hidden' }}>
+              <div style={{ padding:'12px 18px', borderBottom:`1px solid ${T.nude}`, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <h3 style={{ fontFamily:T.fontSerif, fontSize:15, color:T.dark, margin:0, display:'flex', alignItems:'center', gap:7 }}>
+                  📝 Notas
+                </h3>
+                <span style={{ background:T.sageG, color:T.sage, border:`1px solid ${T.sageP}`, fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:T.r100 }}>{notes.length}</span>
+              </div>
+              <div style={{ padding:'12px 18px', borderBottom:`1px solid ${T.nude}` }}>
+                <textarea rows={3} value={noteText} onChange={e=>setNoteText(e.target.value)} placeholder={editNoteId?'Editar nota...':'Nova anotação rápida...'}
+                  style={{ width:'100%', padding:'9px 11px', fontSize:13, color:T.dark, background:T.off, border:`1.5px solid ${T.nude}`, borderRadius:T.r12, outline:'none', resize:'vertical', fontFamily:T.fontSans, marginBottom:8, transition:'border-color 0.15s', boxSizing:'border-box' }}
+                  onFocus={e=>e.target.style.borderColor=T.sage} onBlur={e=>e.target.style.borderColor=T.nude}/>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                  <span style={{ fontSize:11, color:T.muted, fontWeight:600, flexShrink:0 }}>Cor:</span>
+                  {Object.entries(NOTE_COLORS).map(([k,v])=>(
+                    <button key={k} type="button" onClick={()=>setNoteColor(k)} style={{ width:18,height:18,borderRadius:'50%',background:v.bg,border:`2px solid ${noteColor===k?T.sage:v.border}`,cursor:'pointer',transition:'transform 0.15s',transform:noteColor===k?'scale(1.2)':'scale(1)',flexShrink:0 }}/>
+                  ))}
+                </div>
+                <div style={{ display:'flex', gap:7 }}>
+                  {editNoteId && (
+                    <button onClick={()=>{setEditNoteId(null);setNoteText('');setNoteColor('sage')}}
+                      style={{ padding:'7px 11px', background:'transparent', border:`1.5px solid ${T.nude}`, borderRadius:T.r10, fontSize:12, fontWeight:600, cursor:'pointer', color:T.muted, fontFamily:T.fontSans }}>
+                      Cancelar
+                    </button>
+                  )}
+                  <button onClick={saveNote} disabled={!noteText.trim()}
+                    style={{ flex:1, padding:'8px', background:T.sage, color:T.cream, border:'none', borderRadius:T.r10, fontSize:12, fontWeight:700, cursor:noteText.trim()?'pointer':'not-allowed', fontFamily:T.fontSans, opacity:noteText.trim()?1:0.45 }}>
+                    {editNoteId ? '💾 Salvar edição' : '+ Adicionar nota'}
+                  </button>
                 </div>
               </div>
-            )}
+              <div style={{ maxHeight:280, overflowY:'auto', padding:'10px 12px', display:'flex', flexDirection:'column', gap:8 }}>
+                {filteredNotes.length===0 && (
+                  <div style={{ padding:'20px', textAlign:'center', color:T.muted }}>
+                    {q ? <p style={{ fontSize:13, margin:0 }}>Nenhuma nota para "{search}"</p> : <><div style={{ fontSize:26, marginBottom:6 }}>📝</div><p style={{ fontSize:13, margin:0 }}>Nenhuma nota ainda.</p></>}
+                  </div>
+                )}
+                {filteredNotes.map(n=>{
+                  const c = NOTE_COLORS[n.color]||NOTE_COLORS.sage
+                  return (
+                    <div key={n.id} style={{ background:c.bg, border:`1px solid ${c.border}`, borderRadius:T.r14, padding:'11px 13px', boxShadow:T.shadowSm }}>
+                      <p style={{ fontSize:12, color:c.text, lineHeight:1.6, margin:'0 0 6px', whiteSpace:'pre-wrap', wordBreak:'break-word' }}>{n.content}</p>
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                        <span style={{ fontSize:10, color:`${c.text}55`, fontWeight:500 }}>{format(parseISO(n.updated_at),'dd/MM HH:mm')}</span>
+                        <div style={{ display:'flex', gap:4 }}>
+                          <button onClick={()=>startEditNote(n)} style={{ background:'none',border:'none',cursor:'pointer',color:`${c.text}55`,padding:2,display:'flex' }}><Edit2 size={11}/></button>
+                          <button onClick={()=>deleteNote(n.id)} style={{ background:'none',border:'none',cursor:'pointer',color:`${c.text}55`,padding:2,display:'flex' }}><Trash2 size={11}/></button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* ─── LEMBRETES ─── */}
+            <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, overflow:'hidden' }}>
+              <div style={{ padding:'12px 18px', borderBottom:`1px solid ${T.nude}`, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <h3 style={{ fontFamily:T.fontSerif, fontSize:15, color:T.dark, margin:0, display:'flex', alignItems:'center', gap:7 }}>
+                  <Bell size={14} style={{color:T.sage}}/> Lembretes
+                </h3>
+                <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+                  {urgentRem.length>0 && <span style={{ background:'#fef2f2', color:'#e05252', border:'1px solid #fecaca', fontSize:9, fontWeight:700, padding:'2px 7px', borderRadius:T.r100 }}>{urgentRem.length} urgente{urgentRem.length>1?'s':''}</span>}
+                  <span style={{ background:T.sageG, color:T.sage, border:`1px solid ${T.sageP}`, fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:T.r100 }}>{reminders.length}</span>
+                </div>
+              </div>
+              <div style={{ padding:'12px 18px', borderBottom:`1px solid ${T.nude}` }}>
+                <FI value={remTitle} set={setRemTitle} placeholder="Ex: Ligar para paciente Maria" style={{ width:'100%', marginBottom:7 }} onKeyDown={(e:any)=>e.key==='Enter'&&(remDate&&remTime)&&addReminder()}/>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7, marginBottom:7 }}>
+                  <FI value={remDate} set={setRemDate} type="date" style={{ width:'100%' }}/>
+                  <FI value={remTime} set={setRemTime} type="time" style={{ width:'100%' }}/>
+                </div>
+                <button onClick={addReminder} disabled={!remTitle.trim()||!remDate||!remTime}
+                  style={{ width:'100%', padding:'8px', background:T.sage, color:T.cream, border:'none', borderRadius:T.r10, fontSize:12, fontWeight:700, cursor:(remTitle.trim()&&remDate&&remTime)?'pointer':'not-allowed', fontFamily:T.fontSans, display:'flex', alignItems:'center', justifyContent:'center', gap:5, opacity:(remTitle.trim()&&remDate&&remTime)?1:0.45 }}>
+                  <Plus size={13}/> Adicionar lembrete
+                </button>
+              </div>
+              <div style={{ maxHeight:260, overflowY:'auto' }}>
+                {filteredRem.length===0 && (
+                  <div style={{ padding:'28px', textAlign:'center', color:T.muted }}>
+                    {q ? <p style={{ fontSize:13, margin:0 }}>Nenhum lembrete para "{search}"</p> : <><div style={{ fontSize:26, marginBottom:6 }}>🔔</div><p style={{ fontSize:13, margin:0 }}>Nenhum lembrete ainda.</p></>}
+                  </div>
+                )}
+                {filteredRem.map(r=>{
+                  const dt = parseISO(r.remind_at)
+                  const over = isBefore(dt,new Date())&&!r.done
+                  const urg  = isBefore(dt,addDays(new Date(),2))&&!r.done
+                  return (
+                    <div key={r.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'11px 18px', borderBottom:`1px solid ${T.nude}`, opacity:r.done?0.45:1, background:over?'#fef2f208':'transparent' }}>
+                      <button onClick={()=>toggleReminder(r.id,!r.done)} style={{ width:18,height:18,borderRadius:'50%',border:`2px solid ${r.done?T.sage:urg?'#e05252':T.nude}`,background:r.done?T.sage:'white',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,transition:'all 0.15s' }}>
+                        {r.done&&<Check size={9} color="white" strokeWidth={3}/>}
+                      </button>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <p style={{ fontWeight:600, fontSize:12, color:T.dark, margin:0, textDecoration:r.done?'line-through':'none', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.title}</p>
+                        <p style={{ fontSize:10, color:over?'#e05252':T.muted, margin:0, display:'flex', alignItems:'center', gap:3 }}>
+                          <Clock size={9}/> {format(dt,"dd/MM 'às' HH:mm")}
+                          {over&&!r.done&&<span style={{ color:'#e05252', fontWeight:700 }}> · Vencido</span>}
+                        </p>
+                      </div>
+                      <button onClick={()=>deleteReminder(r.id)} style={{ background:'none',border:'none',cursor:'pointer',color:T.nude,padding:2,display:'flex',transition:'color 0.15s' }} onMouseEnter={e=>e.currentTarget.style.color='#ef4444'} onMouseLeave={e=>e.currentTarget.style.color=T.nude}><Trash2 size={12}/></button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Stats footer */}
+            <div style={{ background:T.white, borderRadius:T.r14, padding:'10px 16px', boxShadow:T.shadowCard, display:'flex', justifyContent:'space-around', flexWrap:'wrap', gap:6 }}>
+              <span style={{ fontSize:11, fontWeight:700, color:T.sage, display:'flex', alignItems:'center', gap:4 }}><Check size={11}/> {tasks.length} tarefa{tasks.length!==1?'s':''}</span>
+              <span style={{ fontSize:11, fontWeight:600, color:T.muted, display:'flex', alignItems:'center', gap:4 }}>📝 {notes.length} nota{notes.length!==1?'s':''}</span>
+              <span style={{ fontSize:11, fontWeight:600, color:T.muted, display:'flex', alignItems:'center', gap:4 }}>🔔 {reminders.length} lembrete{reminders.length!==1?'s':''}</span>
+            </div>
+
           </div>
         </div>
       </div>
