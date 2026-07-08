@@ -104,6 +104,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
   const [clientEmail, setCE]    = useState('')
   const [notes, setNotes]       = useState('')
   const [submitting, setSub]    = useState(false)
+  const [bookError, setBookError] = useState('')
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
@@ -146,22 +147,25 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
     e.preventDefault()
     if (!profile||!selDate||!selTime) return
     setSub(true)
-    const { data: appt, error } = await supabase.from('appointments').insert({
+    setBookError('')
+    const { error } = await supabase.from('appointments').insert({
       professional_id:profile.id, client_name:clientName, client_phone:clientPhone,
       client_email:clientEmail||null, notes:notes||null,
       appt_date:selDate, appt_time:selTime+':00',
-    }).select().single()
-    if (!error && appt) {
+    })
+    if (!error) {
       track(profile.id, 'booking_completed')
       if (profile.whatsapp) {
         fetch('/api/whatsapp', { method:'POST', headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({ appointment_id:appt.id, professional_phone:profile.whatsapp, professional_name:profile.name, client_name:clientName, client_phone:clientPhone, appt_date:selDate, appt_time:selTime }) })
+          body:JSON.stringify({ professional_phone:profile.whatsapp, professional_name:profile.name, client_name:clientName, client_phone:clientPhone, appt_date:selDate, appt_time:selTime }) })
       }
       if (clientEmail) {
         fetch('/api/email', { method:'POST', headers:{'Content-Type':'application/json'},
           body:JSON.stringify({ type:'confirmation', to:clientEmail, client:clientName, professional:profile.name, date:selDate, time:selTime }) })
       }
       setStep('done')
+    } else {
+      setBookError('Não foi possível confirmar o agendamento. Tente novamente ou entre em contato pelo WhatsApp.')
     }
     setSub(false)
   }
@@ -595,8 +599,14 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
                 </div>
                 <BookInput label="E-mail (para confirmação)" value={clientEmail} set={setCE} placeholder="seu@email.com" type="email" th={th}/>
                 <BookInput label="Observações (opcional)" value={notes} set={setNotes} placeholder="Alguma informação importante que devo saber?" th={th} rows={3}/>
+                {bookError && (
+                  <div style={{ marginTop:12, padding:'12px 16px', background:'#FEF2F2', border:'1px solid #FECACA', borderRadius:T.r12, fontSize:13, color:'#DC2626', lineHeight:1.5 }}>
+                    ⚠ {bookError}
+                    {wppLink && <><br/><a href={wppLink} target="_blank" rel="noopener" style={{ color:'#25D366', fontWeight:600, textDecoration:'none' }}>Falar no WhatsApp →</a></>}
+                  </div>
+                )}
                 <div style={{ display:'flex', gap:12, marginTop:8 }}>
-                  <button type="button" onClick={()=>setStep('pick')}
+                  <button type="button" onClick={()=>{setStep('pick');setBookError('')}}
                     style={{ padding:'14px 18px', border:`2px solid ${T.nude}`, background:'transparent', color:T.dark, borderRadius:T.r12, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:T.fontSans, transition:'border-color 0.15s' }}
                     onMouseEnter={e=>e.currentTarget.style.borderColor=th.primary} onMouseLeave={e=>e.currentTarget.style.borderColor=T.nude}>
                     ← Voltar
