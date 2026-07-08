@@ -3,8 +3,8 @@ import { useState, useEffect, use, useRef } from 'react'
 import { supabase, Profile, Availability } from '@/lib/supabase'
 import { T, GlobalStyles } from '@/lib/ds'
 import { getTemplate } from '@/lib/templates'
-import { MapPin, Clock, Monitor, Heart, Phone, ArrowRight, Check } from 'lucide-react'
-import { format, addDays } from 'date-fns'
+import { MapPin, Clock, Monitor, Heart, ArrowRight, Check, ChevronLeft, ChevronRight } from 'lucide-react'
+import { format, addDays, startOfDay } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
 // ── WhatsApp SVG icon ──────────────────────────────────────────────────────
@@ -106,6 +106,10 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
   const [submitting, setSub]    = useState(false)
   const [bookError, setBookError] = useState('')
   const [scrolled, setScrolled] = useState(false)
+  const [calView, setCalView]   = useState(() => {
+    const n = new Date()
+    return { year: n.getFullYear(), month: n.getMonth() }
+  })
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 60)
@@ -138,10 +142,24 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
     bookRef.current?.scrollIntoView({ behavior:'smooth', block:'start' })
   }
 
-  const weekDates = Array.from({length:21}).map((_,i)=>addDays(new Date(),i))
-    .filter(d=>avail.some(a=>a.day_of_week===d.getDay()))
   const dayAvail = selDate ? avail.find(a=>a.day_of_week===new Date(selDate+'T12:00').getDay()) : null
   const slots    = dayAvail ? genSlots(dayAvail.start_time, dayAvail.end_time, dayAvail.slot_minutes) : []
+
+  // Calendar month navigation — max 2 months (current + next)
+  const _now = new Date()
+  const _curY = _now.getFullYear(), _curM = _now.getMonth()
+  const _maxY = _curM === 11 ? _curY + 1 : _curY
+  const _maxM = (_curM + 1) % 12
+  const canGoPrev = calView.year > _curY || calView.month > _curM
+  const canGoNext = calView.year < _maxY || (calView.year === _maxY && calView.month < _maxM)
+  function prevMonth() {
+    if (!canGoPrev) return
+    setCalView(v => v.month === 0 ? { year: v.year-1, month: 11 } : { year: v.year, month: v.month-1 })
+  }
+  function nextMonth() {
+    if (!canGoNext) return
+    setCalView(v => v.month === 11 ? { year: v.year+1, month: 0 } : { year: v.year, month: v.month+1 })
+  }
 
   async function handleBook(e: React.FormEvent) {
     e.preventDefault()
@@ -623,8 +641,8 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
 
             {/* PICK */}
             {step==='pick' && (
-              <div style={{ padding:'32px' }}>
-                {weekDates.length === 0 ? (
+              <div style={{ padding:'clamp(20px,4vw,32px)' }}>
+                {avail.length === 0 ? (
                   <div style={{ padding:'48px', textAlign:'center' }}>
                     <div style={{ fontSize:48, marginBottom:16 }}>📅</div>
                     <h3 style={{ fontFamily:T.fontSerif, fontSize:22, color:T.dark, marginBottom:8 }}>Sem horários disponíveis</h3>
@@ -633,39 +651,41 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
                   </div>
                 ) : (
                   <>
-                    <p style={{ fontSize:12, fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>Escolha uma data disponível</p>
-                    <div style={{ display:'flex', gap:10, overflowX:'auto', paddingBottom:10, marginBottom:28 }}>
-                      {weekDates.slice(0,14).map(d => {
-                        const ds = format(d,'yyyy-MM-dd')
-                        const sel = selDate===ds
-                        return (
-                          <button key={ds} type="button" onClick={()=>{setSelDate(ds);setSelTime(null)}}
-                            style={{ flexShrink:0, display:'flex', flexDirection:'column', alignItems:'center', padding:'12px 16px', borderRadius:T.r16, border:`2px solid ${sel?th.primary:T.nude}`, background:sel?th.primary:T.white, color:sel?'#fff':T.dark, cursor:'pointer', fontFamily:T.fontSans, transition:'all 0.15s', minWidth:64, boxShadow:sel?`0 4px 14px ${th.primary}44`:T.shadowSm }}>
-                            <span style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', opacity:0.8, marginBottom:4 }}>{format(d,'EEE',{locale:ptBR})}</span>
-                            <span style={{ fontFamily:T.fontSerif, fontSize:24, lineHeight:1.1 }}>{format(d,'dd')}</span>
-                            <span style={{ fontSize:10, opacity:0.7, marginTop:2 }}>{format(d,'MMM',{locale:ptBR})}</span>
-                          </button>
-                        )
-                      })}
-                    </div>
+                    {/* ── Monthly calendar ───────────────────────────────── */}
+                    <CalPicker
+                      avail={avail}
+                      selDate={selDate}
+                      calView={calView}
+                      canPrev={canGoPrev}
+                      canNext={canGoNext}
+                      onSelect={(ds)=>{setSelDate(ds);setSelTime(null)}}
+                      onPrev={prevMonth}
+                      onNext={nextMonth}
+                      th={th}
+                    />
 
+                    {/* ── Time slots ─────────────────────────────────────── */}
                     {selDate && (
-                      <div style={{ animation:'fadeUp 0.3s ease' }}>
+                      <div style={{ animation:'fadeUp 0.35s ease', marginTop:28, paddingTop:24, borderTop:`1px solid ${T.nude}` }}>
                         <p style={{ fontSize:12, fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
-                          Horários disponíveis — {format(new Date(selDate+'T12:00'),'EEEE',{locale:ptBR})}
+                          Horários disponíveis — {format(new Date(selDate+'T12:00'),'EEEE, dd/MM',{locale:ptBR})}
                         </p>
-                        <div style={{ display:'flex', flexWrap:'wrap', gap:10, marginBottom:24 }}>
-                          {slots.map(s => {
-                            const isTaken = taken.includes(s)
-                            const isSel   = selTime===s
-                            return (
-                              <button key={s} type="button" disabled={isTaken} onClick={()=>setSelTime(s)}
-                                style={{ padding:'11px 18px', borderRadius:T.r12, border:`2px solid ${isTaken?T.nude:isSel?th.primary:T.nude}`, background:isTaken?T.off:isSel?th.primary:T.white, color:isTaken?T.muted:isSel?'#fff':T.dark, fontSize:14, fontWeight:600, cursor:isTaken?'not-allowed':'pointer', fontFamily:T.fontSans, transition:'all 0.15s', opacity:isTaken?0.4:1, boxShadow:isSel?`0 4px 14px ${th.primary}44`:T.shadowSm }}>
-                                {s}{isTaken&&' ✗'}
-                              </button>
-                            )
-                          })}
-                        </div>
+                        {slots.length === 0 ? (
+                          <p style={{ fontSize:14, color:T.muted, marginBottom:20 }}>Nenhum horário configurado para esse dia.</p>
+                        ) : (
+                          <div style={{ display:'flex', flexWrap:'wrap', gap:10, marginBottom:24 }}>
+                            {slots.map(s => {
+                              const isTaken = taken.includes(s)
+                              const isSel   = selTime===s
+                              return (
+                                <button key={s} type="button" disabled={isTaken} onClick={()=>setSelTime(s)}
+                                  style={{ padding:'11px 18px', borderRadius:T.r12, border:`2px solid ${isTaken?T.nude:isSel?th.primary:T.nude}`, background:isTaken?T.off:isSel?th.primary:T.white, color:isTaken?T.muted:isSel?'#fff':T.dark, fontSize:14, fontWeight:600, cursor:isTaken?'not-allowed':'pointer', fontFamily:T.fontSans, transition:'all 0.15s', opacity:isTaken?0.4:1, boxShadow:isSel?`0 4px 14px ${th.primary}44`:T.shadowSm }}>
+                                  {s}{isTaken&&' ✗'}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
                         {selTime && (
                           <button type="button" onClick={()=>{track(profile!.id,'booking_started');setStep('form')}}
                             style={{ width:'100%', padding:'16px', background:th.dark, color:'#FAFAF7', border:'none', borderRadius:T.r14, fontSize:16, fontWeight:700, cursor:'pointer', fontFamily:T.fontSans, display:'flex', alignItems:'center', justifyContent:'center', gap:8, transition:'background 0.2s', boxShadow:`0 6px 20px ${th.dark}30` }}
@@ -774,6 +794,147 @@ function BookInput({ label, value, set, placeholder, required=false, type='text'
         ? <textarea rows={rows} value={value} onChange={e=>set(e.target.value)} placeholder={placeholder} style={style0} onFocus={()=>setF(true)} onBlur={()=>setF(false)}/>
         : <input type={type} value={value} onChange={e=>set(e.target.value)} placeholder={placeholder} required={required} style={style0} onFocus={()=>setF(true)} onBlur={()=>setF(false)}/>
       }
+    </div>
+  )
+}
+
+// ── Monthly calendar picker ────────────────────────────────────────────────
+const DOW_PT = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
+
+function CalPicker({ avail, selDate, calView, canPrev, canNext, onSelect, onPrev, onNext, th }: {
+  avail: Availability[]
+  selDate: string | null
+  calView: { year: number; month: number }
+  canPrev: boolean
+  canNext: boolean
+  onSelect: (ds: string) => void
+  onPrev: () => void
+  onNext: () => void
+  th: any
+}) {
+  const today = startOfDay(new Date())
+
+  // Build grid: null = padding cell, Date = real day
+  const firstOfMonth = new Date(calView.year, calView.month, 1)
+  const daysInMonth  = new Date(calView.year, calView.month + 1, 0).getDate()
+  const startDow     = firstOfMonth.getDay() // 0=Sun
+
+  const cells: (Date | null)[] = []
+  for (let i = 0; i < startDow; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(calView.year, calView.month, d))
+  while (cells.length % 7 !== 0) cells.push(null)
+
+  const monthLabel = format(firstOfMonth, 'MMMM yyyy', { locale: ptBR })
+    .replace(/^\w/, c => c.toUpperCase())
+
+  const navBtn = (disabled: boolean, onClick: ()=>void, children: React.ReactNode) => (
+    <button type="button" onClick={onClick} disabled={disabled}
+      style={{
+        width:36, height:36, borderRadius:T.r10,
+        border:`1.5px solid ${disabled ? 'transparent' : T.nude}`,
+        background: disabled ? 'transparent' : T.white,
+        display:'flex', alignItems:'center', justifyContent:'center',
+        cursor: disabled ? 'default' : 'pointer',
+        color: disabled ? '#D0C8BC' : T.dark,
+        transition:'all 0.15s', flexShrink:0,
+      }}
+      onMouseEnter={e=>{if(!disabled){e.currentTarget.style.background=th.glow;e.currentTarget.style.borderColor=th.pale}}}
+      onMouseLeave={e=>{if(!disabled){e.currentTarget.style.background=T.white;e.currentTarget.style.borderColor=T.nude}}}>
+      {children}
+    </button>
+  )
+
+  return (
+    <div style={{ userSelect:'none' }}>
+      <p style={{ fontSize:12, fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:16 }}>
+        Escolha uma data disponível
+      </p>
+
+      {/* Month header */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+        {navBtn(!canPrev, onPrev, <ChevronLeft size={16}/>)}
+        <span style={{ fontFamily:T.fontSerif, fontSize:'clamp(15px,3.5vw,18px)', color:T.dark, fontWeight:600 }}>
+          {monthLabel}
+        </span>
+        {navBtn(!canNext, onNext, <ChevronRight size={16}/>)}
+      </div>
+
+      {/* Day-of-week header */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', marginBottom:4 }}>
+        {DOW_PT.map(d => (
+          <div key={d} style={{ textAlign:'center', fontSize:'clamp(10px,2vw,11px)', fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.05em', padding:'6px 2px' }}>
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Calendar grid */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'clamp(2px,1vw,4px)' }}>
+        {cells.map((d, i) => {
+          if (!d) return <div key={`e${i}`} style={{ aspectRatio:'1' }}/>
+
+          const ds       = format(d, 'yyyy-MM-dd')
+          const isPast   = d < today
+          const isAvail  = !isPast && avail.some(a => a.day_of_week === d.getDay())
+          const isSel    = selDate === ds
+          const isToday  = d.getTime() === today.getTime()
+
+          let bg      = 'transparent'
+          let color   = '#C0B8AE'
+          let border  = '2px solid transparent'
+          let cursor  = 'default'
+          let fw      = 400
+          let opacity = 1
+
+          if (isPast) {
+            color = '#C0B8AE'; opacity = 0.45
+          } else if (isSel) {
+            bg = th.primary; color = '#fff'; border = `2px solid ${th.primary}`; cursor = 'pointer'; fw = 700
+          } else if (isAvail) {
+            bg = th.glow; color = th.primary; border = `2px solid ${th.pale}`; cursor = 'pointer'; fw = 600
+          } else {
+            color = '#C0B8AE'
+          }
+
+          if (isToday && !isSel) border = `2px solid ${th.primary}70`
+
+          return (
+            <button key={ds} type="button" disabled={!isAvail} onClick={() => isAvail && onSelect(ds)}
+              style={{
+                aspectRatio:'1', display:'flex', flexDirection:'column',
+                alignItems:'center', justifyContent:'center',
+                borderRadius:'clamp(6px,1.5vw,10px)',
+                background:bg, color, border, cursor, fontWeight:fw,
+                fontSize:'clamp(12px,2.8vw,14px)', fontFamily:T.fontSans,
+                transition:'all 0.15s', opacity, position:'relative',
+                boxShadow: isSel ? `0 4px 12px ${th.primary}40` : 'none',
+              }}
+              onMouseEnter={e=>{if(isAvail&&!isSel){e.currentTarget.style.background=th.pale;e.currentTarget.style.transform='scale(1.07)';e.currentTarget.style.boxShadow=`0 2px 8px ${th.primary}25`}}}
+              onMouseLeave={e=>{if(isAvail&&!isSel){e.currentTarget.style.background=th.glow;e.currentTarget.style.transform='scale(1)';e.currentTarget.style.boxShadow='none'}}}>
+              {d.getDate()}
+              {isToday && (
+                <span style={{ position:'absolute', bottom:'12%', width:4, height:4, borderRadius:'50%', background:isSel?'rgba(255,255,255,0.8)':th.primary }}/>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Legend */}
+      <div style={{ display:'flex', gap:'10px 20px', justifyContent:'center', flexWrap:'wrap', marginTop:16 }}>
+        {[
+          { bg: th.primary, bd: th.primary, label: 'Selecionado', textCol: '#fff' },
+          { bg: th.glow,    bd: th.pale,    label: 'Disponível',   textCol: th.primary },
+          { bg: 'transparent', bd: 'transparent', label: 'Indisponível', textCol: '#C0B8AE' },
+        ].map(({ bg, bd, label, textCol }) => (
+          <div key={label} style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:T.muted }}>
+            <div style={{ width:14, height:14, borderRadius:4, background:bg, border:`1.5px solid ${bd}`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+              {label==='Selecionado' && <span style={{ width:5, height:5, borderRadius:'50%', background:'#fff', display:'block' }}/>}
+            </div>
+            <span style={{ color:textCol, fontWeight:500 }}>{label}</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
