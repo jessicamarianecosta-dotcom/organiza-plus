@@ -47,6 +47,7 @@ function DashboardContent() {
   const [tab, setTab] = useState<Tab>('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [toast, setToast] = useState('')
+  const [hasSchedule, setHasSchedule] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -56,8 +57,12 @@ function DashboardContent() {
       if (!p) { router.push('/onboarding'); return }
       if (!(p as any).onboarding_done) { router.push('/onboarding'); return }
       setProfile(p)
-      const { data: a } = await supabase.from('appointments').select('*').eq('professional_id', user.id).order('appt_date',{ascending:true}).order('appt_time',{ascending:true}).limit(100)
+      const [{ data: a }, { count: schedCount }] = await Promise.all([
+        supabase.from('appointments').select('*').eq('professional_id', user.id).order('appt_date',{ascending:true}).order('appt_time',{ascending:true}).limit(100),
+        supabase.from('availability').select('*', { count:'exact', head:true }).eq('professional_id', user.id).eq('active', true),
+      ])
       setAppointments(a || [])
+      setHasSchedule((schedCount || 0) > 0)
       setLoading(false)
       if (params.get('payment') === 'success') setToast('🎉 Pagamento confirmado! Plano ativado.')
     } catch {
@@ -84,10 +89,41 @@ function DashboardContent() {
     </div>
   )
 
-  const today = new Date().toISOString().split('T')[0]
+  const now = new Date()
+  const today = now.toISOString().split('T')[0]
   const todayAppts = appointments.filter(a => a.appt_date === today)
   const pending = appointments.filter(a => a.status === 'pending')
   const totalClients = new Set(appointments.map(a => a.client_phone)).size
+
+  const nowTimeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+  const nextAppt = appointments.find(a => a.status !== 'cancelled' && (a.appt_date > today || (a.appt_date === today && a.appt_time > nowTimeStr)))
+
+  const nonCancelled = appointments.filter(a => a.status !== 'cancelled')
+  const confirmed = appointments.filter(a => a.status === 'confirmed' || a.status === 'completed')
+  const confirmRate = nonCancelled.length > 0 ? Math.round(confirmed.length / nonCancelled.length * 100) : 0
+
+  const thisMonthStr = `${today.slice(0,7)}`
+  const prevPhones = new Set(appointments.filter(a => !a.appt_date.startsWith(thisMonthStr)).map(a => a.client_phone))
+  const newPatientsMonth = new Set(appointments.filter(a => a.appt_date.startsWith(thisMonthStr) && !prevPhones.has(a.client_phone)).map(a => a.client_phone)).size
+
+  const in7Str = new Date(now.getTime() + 7*24*60*60*1000).toISOString().split('T')[0]
+  const upcomingAppts = appointments.filter(a => a.appt_date > today && a.appt_date <= in7Str && a.status !== 'cancelled')
+
+  const profileChecks = [
+    { label:'Foto de perfil',          done:!!profile?.photo_url },
+    { label:'WhatsApp',                done:!!profile?.whatsapp },
+    { label:'Horários configurados',   done:hasSchedule },
+    { label:'Especialidades',          done:(profile?.specialties||[]).length > 0 },
+    { label:'Biografia',               done:!!profile?.bio },
+    { label:'Instagram',               done:!!profile?.instagram },
+  ]
+  const completionPct = Math.round(profileChecks.filter(c=>c.done).length / profileChecks.length * 100)
+
+  const alerts: string[] = []
+  if (pending.length > 0) alerts.push(`${pending.length} agendamento${pending.length>1?'s':''} aguardando confirmação`)
+  if (!profile?.bio) alerts.push('Complete sua biografia para atrair mais pacientes')
+  if (!profile?.photo_url) alerts.push('Adicione uma foto de perfil ao seu cadastro')
+  if (!hasSchedule) alerts.push('Configure seus horários de atendimento')
 
   const sidebarW = 224
 
@@ -195,104 +231,231 @@ function DashboardContent() {
         {/* ── TAB: DASHBOARD ── */}
         {tab==='dashboard' && (
           <div className="anim-fade">
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:28, flexWrap:'wrap', gap:12 }}>
+            <style>{`@media(max-width:1024px){.dash-cols{grid-template-columns:1fr!important}}`}</style>
+
+            {/* Greeting */}
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:24, flexWrap:'wrap', gap:12 }}>
               <div>
                 <h1 style={{ fontFamily:T.fontSerif, fontSize:28, color:T.dark, margin:'0 0 4px' }}>
                   Olá, {profile?.name?.split(' ')[0]} 👋
                 </h1>
-                <p style={{ fontSize:14, color:T.muted }}>
+                <p style={{ fontSize:14, color:T.muted, margin:0 }}>
                   {format(new Date(), "EEEE, dd 'de' MMMM 'de' yyyy", {locale:ptBR})}
                 </p>
               </div>
-              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                {pending.length > 0 && (
-                  <span style={{ background:T.amberL, color:T.amber, border:`1px solid ${T.amberB}`, fontSize:11, fontWeight:700, padding:'5px 12px', borderRadius:T.r100 }}>
-                    <Bell size={11} style={{ display:'inline', marginRight:5 }}/>{pending.length} pendente{pending.length>1?'s':''}
-                  </span>
-                )}
-                <span style={{ background:T.sageG, color:T.sage, border:`1px solid ${T.sageP}`, fontSize:11, fontWeight:700, padding:'5px 12px', borderRadius:T.r100 }}>
-                  {profile?.plan==='premium'?'💎 Premium':'🌿 Basic'}
-                </span>
+              <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                {pending.length > 0 && <span style={{ background:T.amberL, color:T.amber, border:`1px solid ${T.amberB}`, fontSize:11, fontWeight:700, padding:'5px 12px', borderRadius:T.r100, display:'flex', alignItems:'center', gap:5 }}><Bell size={11}/>{pending.length} pendente{pending.length>1?'s':''}</span>}
+                <span style={{ background:T.sageG, color:T.sage, border:`1px solid ${T.sageP}`, fontSize:11, fontWeight:700, padding:'5px 12px', borderRadius:T.r100 }}>{profile?.plan==='premium'?'💎 Premium':'🌿 Basic'}</span>
               </div>
             </div>
 
-            {/* Stat cards */}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:16, marginBottom:24 }}>
+            {/* KPI row */}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))', gap:14, marginBottom:24 }}>
               {[
-                { icon:'📅', label:'Hoje',       value:String(todayAppts.length), sub:'agendamentos', color:T.sage },
-                { icon:'👥', label:'Clientes',    value:String(totalClients),       sub:'no total',     color:T.blue },
-                { icon:'⏳', label:'Pendentes',   value:String(pending.length),     sub:'aguardando',   color:T.amber },
-                { icon:'✅', label:'Concluídos',  value:String(appointments.filter(a=>a.status==='completed').length), sub:'no total', color:T.green },
+                { icon:'📅', label:'Hoje',           value:String(todayAppts.length),   sub:'agendamentos',        color:T.sage  },
+                { icon:'👥', label:'Pacientes',       value:String(totalClients),         sub:'cadastrados',         color:T.blue  },
+                { icon:'⏳', label:'Próxima',         value:nextAppt?nextAppt.appt_time.slice(0,5):'—', sub:nextAppt?nextAppt.client_name.split(' ')[0]:'sem consulta', color:T.amber },
+                { icon:'⭐', label:'Confirmações',    value:`${confirmRate}%`,            sub:'taxa de confirmação', color:'#7c3aed' },
+                { icon:'🔥', label:'Novos',           value:String(newPatientsMonth),     sub:'pacientes este mês',  color:T.red   },
+                { icon:'👁️', label:'Visualizações',  value:'—',                          sub:'analytics em breve',  color:T.muted },
               ].map(c=>(
-                <div key={c.label} style={{ background:T.white, borderRadius:T.r20, padding:'20px', boxShadow:T.shadowCard }}>
-                  <div style={{ fontSize:22, marginBottom:10 }}>{c.icon}</div>
+                <div key={c.label} style={{ background:T.white, borderRadius:T.r20, padding:'18px 20px', boxShadow:T.shadowCard }}>
+                  <div style={{ fontSize:20, marginBottom:8 }}>{c.icon}</div>
                   <p style={{ fontSize:10, fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.08em', margin:0 }}>{c.label}</p>
-                  <p style={{ fontSize:30, fontWeight:800, color:T.dark, margin:'5px 0 2px', lineHeight:1 }}>{c.value}</p>
+                  <p style={{ fontSize:28, fontWeight:800, color:T.dark, margin:'5px 0 2px', lineHeight:1 }}>{c.value}</p>
                   <p style={{ fontSize:11, color:c.color, fontWeight:500, margin:0 }}>{c.sub}</p>
                 </div>
               ))}
             </div>
 
-            {/* Pending alert */}
-            {pending.length > 0 && (
-              <div style={{ background:T.amberL, border:`1px solid ${T.amberB}`, borderRadius:T.r20, padding:'18px 20px', marginBottom:20 }}>
-                <p style={{ fontSize:13, fontWeight:700, color:T.amber, margin:'0 0 12px', display:'flex', alignItems:'center', gap:8 }}>
-                  <Bell size={15}/> {pending.length} agendamento{pending.length>1?'s':''} aguardando confirmação
-                </p>
-                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                  {pending.slice(0,3).map(a=>(
-                    <div key={a.id} style={{ background:T.white, borderRadius:T.r12, padding:'12px 14px', display:'flex', alignItems:'center', gap:12, boxShadow:T.shadowSm }}>
-                      <div style={{ flex:1 }}>
-                        <p style={{ fontWeight:700, fontSize:14, color:T.dark, margin:0 }}>{a.client_name}</p>
-                        <p style={{ fontSize:12, color:T.muted, margin:0 }}>{a.appt_date} às {a.appt_time.slice(0,5)}</p>
-                      </div>
-                      <div style={{ display:'flex', gap:8 }}>
-                        <button onClick={()=>updateStatus(a.id,'confirmed')} style={{ display:'flex', alignItems:'center', gap:5, background:T.sage, color:T.cream, border:'none', borderRadius:T.r10, padding:'7px 12px', fontSize:12, fontWeight:600, cursor:'pointer' }}>
-                          <CheckCircle size={13}/> Confirmar
-                        </button>
-                        <button onClick={()=>updateStatus(a.id,'cancelled')} style={{ display:'flex', alignItems:'center', gap:5, background:T.redL, color:T.red, border:'none', borderRadius:T.r10, padding:'7px 12px', fontSize:12, fontWeight:600, cursor:'pointer' }}>
-                          <XCircle size={13}/> Cancelar
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Two-column layout */}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 300px', gap:20, alignItems:'start' }} className="dash-cols">
 
-            {/* Today's appointments */}
-            <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, overflow:'hidden' }}>
-              <div style={{ padding:'16px 20px', borderBottom:`1px solid ${T.nude}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <h2 style={{ fontFamily:T.fontSerif, fontSize:20, color:T.dark, margin:0 }}>Agendamentos de hoje</h2>
-                <span style={{ background:T.sageG, color:T.sage, fontSize:11, fontWeight:700, padding:'4px 11px', borderRadius:T.r100, border:`1px solid ${T.sageP}` }}>
-                  {todayAppts.length} hoje
-                </span>
-              </div>
-              {todayAppts.length === 0 ? (
-                <div style={{ padding:'48px 24px', textAlign:'center', color:T.muted }}>
-                  <div style={{ fontSize:40, marginBottom:12 }}>📅</div>
-                  <p style={{ fontWeight:600, color:T.dark, marginBottom:4 }}>Nenhum agendamento hoje</p>
-                  <p style={{ fontSize:13 }}>Compartilhe sua página pública para receber mais clientes.</p>
-                  {profile && <Link href={`/p/${profile.slug}`} target="_blank" style={{ color:T.sage, fontSize:13, fontWeight:600, marginTop:8, display:'inline-block' }}>Ver minha página →</Link>}
+              {/* LEFT: Timeline + Próximos 7 dias */}
+              <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+
+                {/* Timeline de hoje */}
+                <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, overflow:'hidden' }}>
+                  <div style={{ padding:'16px 20px', borderBottom:`1px solid ${T.nude}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <h2 style={{ fontFamily:T.fontSerif, fontSize:18, color:T.dark, margin:0 }}>Agenda de hoje</h2>
+                    <span style={{ background:T.sageG, color:T.sage, fontSize:11, fontWeight:700, padding:'4px 11px', borderRadius:T.r100, border:`1px solid ${T.sageP}` }}>{todayAppts.length} consulta{todayAppts.length!==1?'s':''}</span>
+                  </div>
+                  <div style={{ padding:'20px' }}>
+                    {todayAppts.length === 0 ? (
+                      <div style={{ padding:'24px', textAlign:'center', color:T.muted }}>
+                        <div style={{ fontSize:36, marginBottom:8 }}>📅</div>
+                        <p style={{ fontWeight:600, color:T.dark, margin:'0 0 4px' }}>Dia livre!</p>
+                        <p style={{ fontSize:13, margin:'0 0 12px' }}>Nenhuma consulta hoje.</p>
+                        {profile && <Link href={`/p/${profile.slug}`} target="_blank" style={{ color:T.sage, fontSize:13, fontWeight:600 }}>Ver minha página →</Link>}
+                      </div>
+                    ) : (
+                      <div style={{ position:'relative' }}>
+                        <div style={{ position:'absolute', left:19, top:20, bottom:20, width:2, background:T.nude, borderRadius:1 }}/>
+                        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                          {todayAppts.map(a=>{
+                            const sc = ({
+                              confirmed:{ color:T.sage,  bg:T.sageG,  label:'Confirmado' },
+                              pending:  { color:T.amber, bg:T.amberL, label:'Aguardando' },
+                              completed:{ color:T.blue,  bg:T.blueL,  label:'Concluído'  },
+                              cancelled:{ color:T.red,   bg:T.redL,   label:'Cancelado'  },
+                            } as any)[a.status] || { color:T.muted, bg:T.off, label:a.status }
+                            return (
+                              <div key={a.id} style={{ display:'flex', gap:14, alignItems:'flex-start' }}>
+                                <div style={{ width:40, height:40, borderRadius:'50%', background:sc.bg, border:`2.5px solid ${sc.color}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, zIndex:1, position:'relative' }}>
+                                  <span style={{ fontSize:10, fontWeight:800, color:sc.color, textAlign:'center', lineHeight:1 }}>{a.appt_time.slice(0,5)}</span>
+                                </div>
+                                <div style={{ flex:1, background:T.off, borderRadius:T.r14, padding:'10px 14px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                                  <div style={{ flex:1, minWidth:0 }}>
+                                    <p style={{ fontWeight:700, fontSize:14, color:T.dark, margin:0 }}>{a.client_name}</p>
+                                    <p style={{ fontSize:11, color:T.muted, margin:0 }}>{a.client_phone}</p>
+                                  </div>
+                                  <span style={{ fontSize:10, fontWeight:700, padding:'3px 9px', borderRadius:T.r100, background:sc.bg, color:sc.color, flexShrink:0 }}>{sc.label}</span>
+                                  {a.status==='pending' && (
+                                    <div style={{ display:'flex', gap:5, flexShrink:0 }}>
+                                      <button onClick={()=>updateStatus(a.id,'confirmed')} style={{ background:T.sage, color:T.cream, border:'none', borderRadius:T.r8, padding:'5px 10px', cursor:'pointer', fontSize:12, fontWeight:600 }}>✓</button>
+                                      <button onClick={()=>updateStatus(a.id,'cancelled')} style={{ background:T.redL, color:T.red, border:'none', borderRadius:T.r8, padding:'5px 10px', cursor:'pointer', fontSize:12, fontWeight:600 }}>✗</button>
+                                    </div>
+                                  )}
+                                  {a.status==='confirmed' && (
+                                    <button onClick={()=>updateStatus(a.id,'completed')} style={{ background:T.blueL, color:T.blue, border:'none', borderRadius:T.r8, padding:'5px 10px', cursor:'pointer', fontSize:11, fontWeight:600, flexShrink:0 }}>Concluir</button>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              ) : todayAppts.map(a=>(
-                <div key={a.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 20px', borderBottom:`1px solid ${T.nude}` }}>
-                  <div style={{ background:T.sageG, color:T.sage, fontSize:12, fontWeight:700, padding:'6px 10px', borderRadius:T.r10, flexShrink:0, minWidth:52, textAlign:'center' }}>
-                    {a.appt_time.slice(0,5)}
+
+                {/* Próximos 7 dias */}
+                <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, overflow:'hidden' }}>
+                  <div style={{ padding:'16px 20px', borderBottom:`1px solid ${T.nude}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <h2 style={{ fontFamily:T.fontSerif, fontSize:18, color:T.dark, margin:0 }}>Próximos 7 dias</h2>
+                    <span style={{ fontSize:11, color:T.muted, fontWeight:500 }}>{upcomingAppts.length} agendamento{upcomingAppts.length!==1?'s':''}</span>
                   </div>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <p style={{ fontWeight:600, fontSize:14, color:T.dark, margin:0 }}>{a.client_name}</p>
-                    <p style={{ fontSize:12, color:T.muted, margin:0 }}>{a.client_phone}</p>
-                  </div>
-                  <StatusBadge status={a.status}/>
-                  {a.status==='pending' && (
-                    <div style={{ display:'flex', gap:6 }}>
-                      <button onClick={()=>updateStatus(a.id,'confirmed')} style={{ background:T.sage, color:T.cream, border:'none', borderRadius:T.r10, padding:'6px 10px', cursor:'pointer', fontSize:12 }}>✓</button>
-                      <button onClick={()=>updateStatus(a.id,'cancelled')} style={{ background:T.redL, color:T.red, border:'none', borderRadius:T.r10, padding:'6px 10px', cursor:'pointer', fontSize:12 }}>✗</button>
+                  {upcomingAppts.length === 0 ? (
+                    <div style={{ padding:'32px', textAlign:'center', color:T.muted }}>
+                      <div style={{ fontSize:32, marginBottom:6 }}>🗓️</div>
+                      <p style={{ fontSize:13, margin:0, fontWeight:500 }}>Nenhum agendamento nos próximos dias.</p>
                     </div>
-                  )}
+                  ) : (() => {
+                    const byDate = new Map<string, Appointment[]>()
+                    upcomingAppts.forEach(a => { if (!byDate.has(a.appt_date)) byDate.set(a.appt_date, []); byDate.get(a.appt_date)!.push(a) })
+                    return Array.from(byDate.entries()).map(([date, appts]) => (
+                      <div key={date}>
+                        <div style={{ padding:'7px 20px 4px', fontSize:10, fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.07em', background:`${T.off}80`, borderBottom:`1px solid ${T.nude}` }}>
+                          {format(new Date(date+'T12:00'),"dd 'de' MMMM",{locale:ptBR})}
+                        </div>
+                        {appts.map(a=>(
+                          <div key={a.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 20px', borderBottom:`1px solid ${T.nude}` }}>
+                            <div style={{ background:T.sageG, color:T.sage, fontSize:12, fontWeight:700, padding:'5px 10px', borderRadius:T.r10, flexShrink:0, minWidth:46, textAlign:'center' }}>{a.appt_time.slice(0,5)}</div>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <p style={{ fontWeight:600, fontSize:13, color:T.dark, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{a.client_name}</p>
+                              <p style={{ fontSize:11, color:T.muted, margin:0 }}>{a.client_phone}</p>
+                            </div>
+                            <StatusBadge status={a.status}/>
+                          </div>
+                        ))}
+                      </div>
+                    ))
+                  })()}
                 </div>
-              ))}
+
+              </div>
+
+              {/* RIGHT: Atalhos + Página + Avisos */}
+              <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+                {/* Atalhos rápidos */}
+                <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:'16px 20px' }}>
+                  <h3 style={{ fontFamily:T.fontSerif, fontSize:15, color:T.dark, margin:'0 0 14px' }}>Atalhos rápidos</h3>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    {[
+                      { icon:'📅', label:'Nova consulta',   fn:()=>setTab('agenda')    },
+                      { icon:'👥', label:'Ver clientes',    fn:()=>setTab('clientes')  },
+                      { icon:'🚫', label:'Bloquear agenda', fn:()=>setTab('horarios')  },
+                      { icon:'👤', label:'Editar perfil',   fn:()=>setTab('perfil')    },
+                      { icon:'🔗', label:'Copiar link',     fn:()=>{ if(profile) navigator.clipboard.writeText(`${window.location.origin}/p/${profile.slug}`).then(()=>setToast('🔗 Link copiado!')).catch(()=>{}) } },
+                      { icon:'🌐', label:'Abrir página',    fn:()=>{ if(profile) window.open(`/p/${profile.slug}`,'_blank') } },
+                    ].map(a=>(
+                      <button key={a.label} onClick={a.fn}
+                        style={{ display:'flex', flexDirection:'column', alignItems:'flex-start', gap:5, padding:'12px', background:T.off, border:`1px solid ${T.nude}`, borderRadius:T.r14, cursor:'pointer', fontFamily:T.fontSans, transition:'all 0.15s' }}
+                        onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.background=T.sageG;(e.currentTarget as HTMLElement).style.borderColor=T.sageP}}
+                        onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.background=T.off;(e.currentTarget as HTMLElement).style.borderColor=T.nude}}>
+                        <span style={{ fontSize:18 }}>{a.icon}</span>
+                        <span style={{ fontSize:11, fontWeight:600, color:T.dark, lineHeight:1.3 }}>{a.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sua página */}
+                <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, overflow:'hidden' }}>
+                  <div style={{ padding:'16px 20px', borderBottom:`1px solid ${T.nude}` }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+                      <h3 style={{ fontFamily:T.fontSerif, fontSize:15, color:T.dark, margin:0 }}>Sua página</h3>
+                      {profile && (
+                        <Link href={`/p/${profile.slug}`} target="_blank" style={{ fontSize:11, color:T.sage, fontWeight:600, textDecoration:'none', display:'flex', alignItems:'center', gap:3 }}>
+                          Ver <ExternalLink size={11}/>
+                        </Link>
+                      )}
+                    </div>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
+                      <div style={{ flex:1, height:6, background:T.nude, borderRadius:3, overflow:'hidden' }}>
+                        <div style={{ height:'100%', width:`${completionPct}%`, background:completionPct===100?T.sage:T.amber, borderRadius:3, transition:'width 0.4s' }}/>
+                      </div>
+                      <span style={{ fontSize:11, fontWeight:700, color:completionPct===100?T.sage:T.amber, flexShrink:0 }}>{completionPct}%</span>
+                    </div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                      {[
+                        { label:'Agendamentos', value:String(appointments.length), icon:'📅' },
+                        { label:'Clientes',     value:String(totalClients),        icon:'👥' },
+                        { label:'Visualizações',value:'—',                         icon:'👁️' },
+                        { label:'WhatsApp',     value:'—',                         icon:'📱' },
+                      ].map(s=>(
+                        <div key={s.label} style={{ background:T.off, borderRadius:T.r12, padding:'9px 11px' }}>
+                          <p style={{ fontSize:10, color:T.muted, fontWeight:600, margin:0 }}>{s.icon} {s.label}</p>
+                          <p style={{ fontSize:18, fontWeight:800, color:T.dark, margin:'3px 0 0', lineHeight:1 }}>{s.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Checklist */}
+                  <div style={{ padding:'12px 20px' }}>
+                    <p style={{ fontSize:10, fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.07em', margin:'0 0 10px' }}>Checklist do perfil</p>
+                    <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
+                      {profileChecks.map(c=>(
+                        <div key={c.label} style={{ display:'flex', alignItems:'center', gap:8 }}>
+                          {c.done
+                            ? <CheckCircle size={14} color={T.sage}/>
+                            : <XCircle size={14} color={T.nude}/>}
+                          <span style={{ fontSize:12, color:c.done?T.dark:T.muted }}>{c.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Avisos inteligentes */}
+                {alerts.length > 0 && (
+                  <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:'16px 20px' }}>
+                    <h3 style={{ fontFamily:T.fontSerif, fontSize:15, color:T.dark, margin:'0 0 12px', display:'flex', alignItems:'center', gap:7 }}>
+                      <Bell size={14} style={{color:T.amber}}/> Avisos
+                    </h3>
+                    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                      {alerts.map((al,i)=>(
+                        <div key={i} style={{ display:'flex', gap:8, padding:'9px 12px', background:T.amberL, border:`1px solid ${T.amberB}`, borderRadius:T.r12 }}>
+                          <span style={{ fontSize:12, flexShrink:0 }}>⚠️</span>
+                          <span style={{ fontSize:12, color:T.amber, fontWeight:500, lineHeight:1.4 }}>{al}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              </div>
             </div>
           </div>
         )}
