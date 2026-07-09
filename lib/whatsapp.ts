@@ -1,12 +1,13 @@
 export type WaMessageType =
-  | 'booking_received'  // client receives after booking (pending)
-  | 'new_booking'       // professional receives when client books
-  | 'confirmed'         // client receives when professional confirms
-  | 'cancelled'         // client receives when professional cancels
-  | 'rescheduled'       // client receives when appointment is rescheduled
-  | 'link_updated'      // client receives when meeting link changes
-  | 'reminder_24h'      // client receives 24h before
-  | 'reminder_2h'       // client receives 2h before
+  | 'booking_received'   // paciente recebe ao agendar (pendente)
+  | 'new_booking'        // profissional recebe quando paciente agenda
+  | 'confirmed'          // paciente recebe quando profissional confirma
+  | 'cancelled'          // paciente recebe quando profissional cancela
+  | 'rescheduled'        // paciente recebe quando reagendado
+  | 'link_updated'       // paciente recebe quando link da reuniao muda
+  | 'reminder_24h'       // lembrete 24h antes
+  | 'reminder_2h'        // lembrete 2h antes
+  | 'post_appointment'   // agradecimento pos-atendimento
 
 export interface WaData {
   client_name?: string
@@ -23,138 +24,199 @@ export interface WaData {
   maps_link?: string
   new_date?: string
   new_time?: string
+  // Label dinamico: consulta | sessao | atendimento | reuniao | agendamento
+  appointment_label?: string
 }
 
-function lines(...parts: (string | null | undefined)[]): string {
-  return parts.filter(Boolean).join('\n')
+const SEP = '━━━━━━━━━━━━━━━━━━'
+
+// Preserva strings vazias (criam linha em branco); filtra apenas null/undefined
+function L(...parts: (string | null | undefined)[]): string {
+  return parts.filter((p): p is string => p != null).join('\n')
+}
+
+function cap(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 export function buildWaMessage(type: WaMessageType, d: WaData): string {
+  const lbl = d.appointment_label ?? 'agendamento'
+
   switch (type) {
     case 'booking_received':
-      return lines(
-        `Olá, *${d.client_name}*! 👋`,
+      return L(
+        `\u{1F44B} Olá, *${d.client_name}*!`,
         '',
-        'Recebemos sua solicitação de agendamento.',
+        `Recebemos sua solicitação de ${lbl}. \u{1F4CB}`,
         '',
-        `📅 *Data:* ${d.appt_date}`,
-        `🕒 *Horário:* ${d.appt_time}`,
-        d.modality ? `📍 *Modalidade:* ${d.modality}` : null,
-        d.price    ? `💰 *Valor:* ${d.price}` : null,
+        SEP,
+        `\u{1F4C5} *Data:* ${d.appt_date}`,
+        `\u{1F552} *Horário:* ${d.appt_time}`,
+        d.modality ? `\u{1F4CD} *Modalidade:* ${d.modality}` : null,
+        d.price    ? `\u{1F4B0} *Valor:* ${d.price}` : null,
+        SEP,
         '',
-        'Sua solicitação será analisada pelo profissional. Assim que for aprovada, você receberá uma nova mensagem.',
+        'Sua solicitação será analisada e em breve você receberá a confirmação.',
         '',
-        'Obrigado! 🌿'
+        'Obrigado! \u{1F49A}'
       )
 
     case 'new_booking':
-      return lines(
-        '📅 *Novo Agendamento — Organiza+*',
+      return L(
+        `\u{1F4CB} *Novo ${lbl} — Organiza+*`,
         '',
-        `👤 *Paciente:* ${d.client_name}`,
-        d.client_phone ? `📱 *Telefone:* ${d.client_phone}` : null,
-        `📅 *Data:* ${d.appt_date}`,
-        `🕒 *Horário:* ${d.appt_time}`,
-        d.modality ? `📍 *Modalidade:* ${d.modality}` : null,
-        d.price    ? `💰 *Valor:* ${d.price}` : null,
+        SEP,
+        `\u{1F464} *Paciente:* ${d.client_name}`,
+        d.client_phone ? `\u{1F4F1} *Telefone:* ${d.client_phone}` : null,
+        `\u{1F4C5} *Data:* ${d.appt_date}`,
+        `\u{1F552} *Horário:* ${d.appt_time}`,
+        d.modality ? `\u{1F4CD} *Modalidade:* ${d.modality}` : null,
+        d.price    ? `\u{1F4B0} *Valor:* ${d.price}` : null,
+        SEP,
         '',
         '_Acesse seu painel para confirmar._'
       )
 
     case 'confirmed': {
-      const locationParts: string[] = []
+      const loc: string[] = []
       if (d.modality === 'Online' && d.meeting_link) {
-        locationParts.push('', `🔗 *Link da reunião:* ${d.meeting_link}`)
-      } else if (d.modality === 'Presencial') {
-        if (d.clinic_name || d.address) {
-          locationParts.push('')
-          if (d.clinic_name) locationParts.push(`🏥 *Local:* ${d.clinic_name}`)
-          if (d.address)     locationParts.push(`📍 *Endereço:* ${d.address}`)
-          if (d.maps_link)   locationParts.push(`🗺️ *Google Maps:* ${d.maps_link}`)
-        }
+        loc.push('', '\u{1F4BB} *Link do atendimento:*', d.meeting_link)
+      } else if (d.modality === 'Presencial' && (d.clinic_name || d.address)) {
+        loc.push('')
+        if (d.clinic_name) loc.push(`\u{1F3E5} *Local:* ${d.clinic_name}`)
+        if (d.address)     loc.push(`\u{1F4CD} *Endereço:* ${d.address}`)
+        if (d.maps_link)   loc.push(`\u{1F5FA} *Google Maps:* ${d.maps_link}`)
       }
-      return lines(
-        '✅ *Consulta confirmada!*',
+      return L(
+        `\u{1F44B} Olá, *${d.client_name}*!`,
         '',
-        `Olá, *${d.client_name}*! Sua consulta com *${d.professional_name}* foi confirmada.`,
-        d.professional_specialty ? `🩺 *Especialidade:* ${d.professional_specialty}` : null,
+        `Seu ${lbl} com *${d.professional_name}* foi confirmado. ✅`,
         '',
-        `📅 *Data:* ${d.appt_date}`,
-        `🕒 *Horário:* ${d.appt_time}`,
-        d.modality ? `📍 *Modalidade:* ${d.modality}` : null,
-        d.price    ? `💰 *Valor:* ${d.price}` : null,
-        ...locationParts,
+        SEP,
+        `\u{1F4C5} *Data:* ${d.appt_date}`,
+        `\u{1F552} *Horário:* ${d.appt_time}`,
+        d.professional_specialty ? `\u{1FA7A} *Especialidade:* ${d.professional_specialty}` : null,
+        d.modality ? `\u{1F4CD} *Modalidade:* ${d.modality}` : null,
+        d.price    ? `\u{1F4B0} *Valor:* ${d.price}` : null,
+        SEP,
+        ...loc,
         '',
-        '_Em caso de imprevisto, avise com antecedência. Até breve!_ 🌿'
+        '⚠ Em caso de imprevisto, avise com antecedência.',
+        'Aguardamos você! \u{1F49A}'
       )
     }
 
     case 'cancelled':
-      return lines(
-        '❌ *Agendamento cancelado*',
+      return L(
+        `❌ *${cap(lbl)} cancelado*`,
         '',
-        `Olá, *${d.client_name}*. Infelizmente *${d.professional_name}* precisou cancelar sua consulta.`,
+        `Olá, *${d.client_name}*!`,
         '',
-        `📅 *Data:* ${d.appt_date}`,
-        `🕒 *Horário:* ${d.appt_time}`,
+        `Infelizmente *${d.professional_name}* precisou cancelar seu ${lbl}.`,
         '',
-        '_Para remarcar, entre em contato diretamente com o profissional._'
+        SEP,
+        `\u{1F4C5} *Data:* ${d.appt_date}`,
+        `\u{1F552} *Horário:* ${d.appt_time}`,
+        SEP,
+        '',
+        'Para remarcar, entre em contato diretamente com o profissional.'
       )
 
     case 'rescheduled':
-      return lines(
-        '🔄 *Agendamento alterado*',
+      return L(
+        `\u{1F504} *${cap(lbl)} remarcado*`,
         '',
-        `Olá, *${d.client_name}*! Seu agendamento com *${d.professional_name}* foi alterado.`,
+        `Olá, *${d.client_name}*!`,
         '',
-        `📅 *Nova data:* ${d.new_date}`,
-        `🕒 *Novo horário:* ${d.new_time}`,
+        `Seu ${lbl} com *${d.professional_name}* foi remarcado.`,
         '',
-        '_Até breve!_ 🌿'
+        SEP,
+        `\u{1F4C5} *Nova data:* ${d.new_date}`,
+        `\u{1F552} *Novo horário:* ${d.new_time}`,
+        SEP,
+        '',
+        'Até breve! \u{1F49A}'
       )
 
     case 'link_updated':
-      return lines(
-        '🔗 *Link da consulta atualizado*',
+      return L(
+        '\u{1F4BB} *Link atualizado*',
         '',
-        `Olá, *${d.client_name}*! O link da sua consulta com *${d.professional_name}* foi atualizado.`,
+        `Olá, *${d.client_name}*!`,
         '',
-        `📅 *Data:* ${d.appt_date}`,
-        `🕒 *Horário:* ${d.appt_time}`,
-        `🔗 *Novo link:* ${d.meeting_link}`,
+        `O link do seu ${lbl} com *${d.professional_name}* foi atualizado.`,
         '',
-        '_Guarde este link. O anterior não está mais válido._'
+        SEP,
+        `\u{1F4C5} *Data:* ${d.appt_date}`,
+        `\u{1F552} *Horário:* ${d.appt_time}`,
+        '\u{1F4BB} *Novo link:*',
+        d.meeting_link ?? '',
+        SEP,
+        '',
+        '_O link anterior não está mais válido._'
       )
 
-    case 'reminder_24h':
-      return lines(
-        '🔔 *Lembrete de consulta*',
+    case 'reminder_24h': {
+      const loc: string[] = []
+      if (d.modality === 'Online' && d.meeting_link) {
+        loc.push('', '\u{1F4BB} *Link:*', d.meeting_link)
+      } else if (d.modality === 'Presencial' && d.address) {
+        loc.push('', `\u{1F4CD} *Endereço:* ${d.address}`)
+      }
+      return L(
+        `\u{1F514} *Lembrete de ${lbl}*`,
         '',
-        `Olá, *${d.client_name}*! Sua consulta é amanhã.`,
+        `Olá, *${d.client_name}*! Seu ${lbl} é amanhã.`,
         '',
-        d.professional_name ? `👨‍⚕️ *Profissional:* ${d.professional_name}` : null,
-        `📅 *Data:* ${d.appt_date}`,
-        `🕒 *Horário:* ${d.appt_time}`,
-        d.modality ? `📍 *Modalidade:* ${d.modality}` : null,
-        d.modality === 'Online' && d.meeting_link ? `🔗 *Link:* ${d.meeting_link}` : null,
-        d.modality === 'Presencial' && d.address  ? `📍 *Endereço:* ${d.address}` : null,
+        SEP,
+        d.professional_name ? `\u{1FA7A} *Profissional:* ${d.professional_name}` : null,
+        `\u{1F4C5} *Data:* ${d.appt_date}`,
+        `\u{1F552} *Horário:* ${d.appt_time}`,
+        d.modality ? `\u{1F4CD} *Modalidade:* ${d.modality}` : null,
+        SEP,
+        ...loc,
         '',
-        'Até breve! 🌿'
+        'Até breve! \u{1F49A}'
       )
+    }
 
-    case 'reminder_2h':
-      return lines(
-        '⏰ *Sua consulta é em breve!*',
+    case 'reminder_2h': {
+      const loc: string[] = []
+      if (d.modality === 'Online' && d.meeting_link) {
+        loc.push('', '\u{1F4BB} *Link:*', d.meeting_link)
+      } else if (d.modality === 'Presencial' && d.address) {
+        loc.push('', `\u{1F4CD} *Endereço:* ${d.address}`)
+      }
+      return L(
+        `⏰ *Seu ${lbl} começa em breve!*`,
         '',
-        `Olá, *${d.client_name}*! Lembrete: sua consulta começa em 2 horas.`,
+        `Olá, *${d.client_name}*! Seu ${lbl} começa em 2 horas.`,
         '',
-        d.professional_name ? `👨‍⚕️ *Profissional:* ${d.professional_name}` : null,
-        `📅 *Data:* ${d.appt_date}`,
-        `🕒 *Horário:* ${d.appt_time}`,
-        d.modality === 'Online' && d.meeting_link ? `🔗 *Link:* ${d.meeting_link}` : null,
-        d.modality === 'Presencial' && d.address  ? `📍 *Endereço:* ${d.address}` : null,
+        SEP,
+        d.professional_name ? `\u{1FA7A} *Profissional:* ${d.professional_name}` : null,
+        `\u{1F4C5} *Data:* ${d.appt_date}`,
+        `\u{1F552} *Horário:* ${d.appt_time}`,
+        SEP,
+        ...loc,
         '',
-        'Até breve! 🌿'
+        'Até breve! \u{1F49A}'
+      )
+    }
+
+    case 'post_appointment':
+      return L(
+        `\u{1F64F} *Obrigado pelo seu ${lbl}!*`,
+        '',
+        `Olá, *${d.client_name}*!`,
+        '',
+        'Foi um prazer atendê-lo(a). Esperamos que tudo tenha corrido bem.',
+        '',
+        SEP,
+        `\u{1F4C5} *Data:* ${d.appt_date}`,
+        `\u{1F552} *Horário:* ${d.appt_time}`,
+        SEP,
+        '',
+        'Se precisar remarcar ou tiver alguma dúvida, estamos à disposição. \u{1F49A}'
       )
 
     default:
