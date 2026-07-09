@@ -38,6 +38,12 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
+function greeting(name: string | null | undefined): string {
+  const h = new Date().getHours()
+  const base = h >= 5 && h < 12 ? '🌞 Bom dia' : h < 18 ? '☀️ Boa tarde' : '🌙 Boa noite'
+  return name ? `${base}, ${name}!` : 'Olá! 👋'
+}
+
 function DashboardContent() {
   const router = useRouter()
   const params = useSearchParams()
@@ -408,7 +414,7 @@ function DashboardContent() {
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:24, flexWrap:'wrap', gap:12 }}>
               <div>
                 <h1 style={{ fontFamily:T.fontSerif, fontSize:28, color:T.dark, margin:'0 0 4px' }}>
-                  Olá, {profile?.name?.split(' ')[0]} 👋
+                  {greeting(profile?.name)}
                 </h1>
                 <p style={{ fontSize:14, color:T.muted, margin:0 }}>
                   {format(new Date(), "EEEE, dd 'de' MMMM 'de' yyyy", {locale:ptBR})}
