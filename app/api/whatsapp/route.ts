@@ -12,13 +12,16 @@ function buildSupabase() {
 }
 
 // Message templates
-function msgNewBooking(d: { client_name: string; client_phone: string; appt_date: string; appt_time: string }) {
-  return `✅ *Novo Agendamento — Organiza+*\n\n👤 *Paciente:* ${d.client_name}\n📱 *Telefone:* ${d.client_phone}\n📅 *Data:* ${d.appt_date}\n🕐 *Horário:* ${d.appt_time}\n\n_Acesse seu painel para confirmar._`
+function msgNewBooking(d: { client_name: string; client_phone: string; appt_date: string; appt_time: string; modality?: string; price?: string }) {
+  const modalityLine = d.modality ? `\n📍 *Modalidade:* ${d.modality}` : ''
+  const priceLine = d.price ? `\n💰 *Valor:* ${d.price}` : ''
+  return `✅ *Novo Agendamento — Organiza+*\n\n👤 *Paciente:* ${d.client_name}\n📱 *Telefone:* ${d.client_phone}\n📅 *Data:* ${d.appt_date}\n🕐 *Horário:* ${d.appt_time}${modalityLine}${priceLine}\n\n_Acesse seu painel para confirmar._`
 }
 
-function msgConfirmed(d: { client_name: string; professional_name: string; appt_date: string; appt_time: string; modality?: string }) {
+function msgConfirmed(d: { client_name: string; professional_name: string; appt_date: string; appt_time: string; modality?: string; price?: string }) {
   const modalityLine = d.modality ? `\n📍 *Modalidade:* ${d.modality}` : ''
-  return `✅ *Consulta confirmada!*\n\nOlá, *${d.client_name}*! Sua consulta com *${d.professional_name}* foi confirmada.\n\n📅 *Data:* ${d.appt_date}\n🕐 *Horário:* ${d.appt_time}${modalityLine}\n\n_Em caso de imprevisto, avise com antecedência. Até breve!_ 🌿`
+  const priceLine = d.price ? `\n💰 *Valor:* ${d.price}` : ''
+  return `✅ *Consulta confirmada!*\n\nOlá, *${d.client_name}*! Sua consulta com *${d.professional_name}* foi confirmada.\n\n📅 *Data:* ${d.appt_date}\n🕐 *Horário:* ${d.appt_time}${modalityLine}${priceLine}\n\n_Em caso de imprevisto, avise com antecedência. Até breve!_ 🌿`
 }
 
 async function sendWpp(phone: string, msg: string): Promise<{ sent: boolean; waLink: string; error?: string }> {
@@ -87,6 +90,7 @@ export async function POST(req: NextRequest) {
       appt_date,
       appt_time,
       modality,
+      price,
     } = body
 
     const supabase = buildSupabase()
@@ -94,7 +98,7 @@ export async function POST(req: NextRequest) {
     if (type === 'confirmed') {
       // Notify CLIENT that professional confirmed their appointment
       if (!client_phone) return NextResponse.json({ error: 'Missing client_phone' }, { status: 400 })
-      const msg = msgConfirmed({ client_name, professional_name, appt_date, appt_time, modality })
+      const msg = msgConfirmed({ client_name, professional_name, appt_date, appt_time, modality, price })
       const { sent, waLink, error } = await sendWpp(client_phone, msg)
 
       await log(supabase, {
@@ -105,7 +109,7 @@ export async function POST(req: NextRequest) {
         event_type: 'appointment_confirmed',
         status: sent ? 'sent' : (process.env.WHATSAPP_API_URL ? 'failed' : 'skipped'),
         error_message: error || null,
-        metadata: { appt_date, appt_time, modality },
+        metadata: { appt_date, appt_time, modality, price },
       })
 
       return NextResponse.json({ success: true, sent, waLink })
@@ -113,7 +117,7 @@ export async function POST(req: NextRequest) {
 
     // Default: new_booking — notify PROFESSIONAL about new patient
     if (!professional_phone) return NextResponse.json({ error: 'Missing professional_phone' }, { status: 400 })
-    const msg = msgNewBooking({ client_name, client_phone, appt_date, appt_time })
+    const msg = msgNewBooking({ client_name, client_phone, appt_date, appt_time, modality, price })
     const { sent, waLink, error } = await sendWpp(professional_phone, msg)
 
     if (appointment_id) {

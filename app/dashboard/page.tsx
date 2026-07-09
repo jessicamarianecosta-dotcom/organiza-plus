@@ -83,8 +83,11 @@ function DashboardContent() {
       const appt = appointments.find(a => a.id === id)
       if (!appt || !profile) return
 
-      const modality = profile.online && !profile.in_person ? 'Online'
+      const modality = appt.appointment_type === 'online' ? 'Online'
+        : appt.appointment_type === 'presencial' ? 'Presencial'
+        : profile.online && !profile.in_person ? 'Online'
         : !profile.online && profile.in_person ? 'Presencial' : 'Online ou Presencial'
+      const fmtApptPrice = appt.appointment_price ? `R$ ${appt.appointment_price.toLocaleString('pt-BR',{minimumFractionDigits:2})}` : undefined
 
       const errors: string[] = []
 
@@ -101,6 +104,7 @@ function DashboardContent() {
             date: appt.appt_date,
             time: appt.appt_time.slice(0,5),
             modality,
+            price: fmtApptPrice,
           })
         })
         const emailData = await emailRes.json()
@@ -120,6 +124,7 @@ function DashboardContent() {
             appt_date: appt.appt_date,
             appt_time: appt.appt_time.slice(0,5),
             modality,
+            price: fmtApptPrice,
           })
         })
         const wppData = await wppRes.json()
@@ -373,7 +378,11 @@ function DashboardContent() {
                                   <div style={{ background:T.off, borderRadius:T.r14, padding:'10px 14px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
                                     <div style={{ flex:1, minWidth:0 }}>
                                       <p style={{ fontWeight:700, fontSize:14, color:T.dark, margin:0 }}>{a.client_name}</p>
-                                      <p style={{ fontSize:11, color:T.muted, margin:0 }}>{a.client_phone}</p>
+                                      <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                                        <span style={{ fontSize:11, color:T.muted }}>{a.client_phone}</span>
+                                        {a.appointment_type && <span style={{ fontSize:10, fontWeight:700, padding:'1px 7px', borderRadius:T.r100, background:a.appointment_type==='online'?T.blueL:T.sageG, color:a.appointment_type==='online'?T.blue:T.sage }}>{a.appointment_type==='online'?'💻 Online':'📍 Presencial'}</span>}
+                                        {a.appointment_price && <span style={{ fontSize:10, color:T.muted, fontWeight:600 }}>R$ {a.appointment_price.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>}
+                                      </div>
                                     </div>
                                     <span style={{ fontSize:10, fontWeight:700, padding:'3px 9px', borderRadius:T.r100, background:sc.bg, color:sc.color, flexShrink:0 }}>{sc.label}</span>
                                     {a.status==='pending' && (
@@ -426,7 +435,11 @@ function DashboardContent() {
                             <div style={{ background:T.sageG, color:T.sage, fontSize:12, fontWeight:700, padding:'5px 10px', borderRadius:T.r10, flexShrink:0, minWidth:46, textAlign:'center' }}>{a.appt_time.slice(0,5)}</div>
                             <div style={{ flex:1, minWidth:0 }}>
                               <p style={{ fontWeight:600, fontSize:13, color:T.dark, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{a.client_name}</p>
-                              <p style={{ fontSize:11, color:T.muted, margin:0 }}>{a.client_phone}</p>
+                              <div style={{ display:'flex', alignItems:'center', gap:5, flexWrap:'wrap' }}>
+                                <span style={{ fontSize:11, color:T.muted }}>{a.client_phone}</span>
+                                {a.appointment_type && <span style={{ fontSize:10, fontWeight:700, padding:'1px 7px', borderRadius:T.r100, background:a.appointment_type==='online'?T.blueL:T.sageG, color:a.appointment_type==='online'?T.blue:T.sage }}>{a.appointment_type==='online'?'💻':'📍'}</span>}
+                                {a.appointment_price && <span style={{ fontSize:10, color:T.muted, fontWeight:600 }}>R$ {a.appointment_price.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>}
+                              </div>
                             </div>
                             <StatusBadge status={a.status}/>
                           </div>
@@ -553,7 +566,11 @@ function DashboardContent() {
                   </div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <p style={{ fontWeight:600, fontSize:14, color:T.dark, margin:0 }}>{a.client_name}</p>
-                    <p style={{ fontSize:12, color:T.muted, margin:0 }}>{a.client_phone}{a.client_email?` · ${a.client_email}`:''}</p>
+                    <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                      <span style={{ fontSize:12, color:T.muted }}>{a.client_phone}{a.client_email?` · ${a.client_email}`:''}</span>
+                      {a.appointment_type && <span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:T.r100, background:a.appointment_type==='online'?T.blueL:T.sageG, color:a.appointment_type==='online'?T.blue:T.sage }}>{a.appointment_type==='online'?'💻 Online':'📍 Presencial'}</span>}
+                      {a.appointment_price && <span style={{ fontSize:11, color:T.mid, fontWeight:600 }}>R$ {a.appointment_price.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>}
+                    </div>
                     {a.notes && <p style={{ fontSize:12, color:T.mid, fontStyle:'italic', margin:'2px 0 0' }}>"{a.notes}"</p>}
                   </div>
                   <div style={{ display:'flex', alignItems:'center', gap:8 }}>
@@ -823,16 +840,43 @@ function AvailabilityTab({ profile }: { profile: Profile|null }) {
   )
 }
 
+const PLATFORMS = ['Google Meet','Zoom','Microsoft Teams','WhatsApp','Outra']
+
+function fmtPrice(v: number | null | undefined) {
+  if (!v || v <= 0) return null
+  return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+function parsePrice(s: string): number | null {
+  const n = parseFloat(s.replace(/[^\d,\.]/g, '').replace(',', '.'))
+  return isNaN(n) || n <= 0 ? null : n
+}
+
 function ProfileTab({ profile, onSave }: { profile: Profile|null, onSave:()=>void }) {
   const [form, setForm] = useState({ name:'', bio:'', whatsapp:'', city:'', state:'', specialties:'', crm:'', instagram:'' })
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [photo, setPhoto] = useState('')
+  const [saving,  setSaving]  = useState(false)
+  const [saved,   setSaved]   = useState(false)
+  const [savingM, setSavingM] = useState(false)
+  const [savedM,  setSavedM]  = useState(false)
+  const [photo,   setPhoto]   = useState('')
+  const [mod, setMod] = useState({
+    online: false, in_person: false,
+    online_platform: 'Google Meet',
+    online_price: '', presential_price: '', clinic_address: '',
+  })
 
   useEffect(() => {
     if (!profile) return
     setForm({ name:profile.name||'', bio:profile.bio||'', whatsapp:profile.whatsapp||'', city:profile.city||'', state:profile.state||'', specialties:(profile.specialties||[]).join(', '), crm:profile.crm_cro_crp||'', instagram:profile.instagram||'' })
     setPhoto(profile.photo_url||'')
+    setMod({
+      online:           profile.online        ?? false,
+      in_person:        profile.in_person     ?? false,
+      online_platform:  profile.online_platform  || 'Google Meet',
+      online_price:     profile.online_price      ? String(profile.online_price).replace('.',',') : '',
+      presential_price: profile.presential_price  ? String(profile.presential_price).replace('.',',') : '',
+      clinic_address:   profile.clinic_address    || '',
+    })
   }, [profile])
 
   async function uploadPhoto(file: File): Promise<string> {
@@ -845,11 +889,32 @@ function ProfileTab({ profile, onSave }: { profile: Profile|null, onSave:()=>voi
 
   async function save(e: React.FormEvent) {
     e.preventDefault(); if (!profile) return; setSaving(true)
-    await supabase.from('profiles').update({ name:form.name, bio:form.bio, whatsapp:form.whatsapp, city:form.city, state:form.state, crm_cro_crp:form.crm, instagram:form.instagram, specialties:form.specialties ? form.specialties.split(',').map((s:string)=>s.trim()).filter(Boolean) : [] }).eq('id',profile.id)
+    await supabase.from('profiles').update({
+      name: form.name, bio: form.bio, whatsapp: form.whatsapp,
+      city: form.city, state: form.state, crm_cro_crp: form.crm,
+      instagram: form.instagram,
+      specialties: form.specialties ? form.specialties.split(',').map((s:string)=>s.trim()).filter(Boolean) : [],
+    }).eq('id', profile.id)
     setSaving(false); setSaved(true); onSave(); setTimeout(()=>setSaved(false),2500)
   }
 
+  async function saveModality(e: React.FormEvent) {
+    e.preventDefault(); if (!profile) return; setSavingM(true)
+    await supabase.from('profiles').update({
+      online:           mod.online,
+      in_person:        mod.in_person,
+      online_platform:  mod.online && mod.online_platform ? mod.online_platform : null,
+      online_price:     mod.online ? parsePrice(mod.online_price) : null,
+      presential_price: mod.in_person ? parsePrice(mod.presential_price) : null,
+      clinic_address:   mod.in_person && mod.clinic_address ? mod.clinic_address : null,
+    }).eq('id', profile.id)
+    setSavingM(false); setSavedM(true); onSave(); setTimeout(()=>setSavedM(false),2500)
+  }
+
   function upd(k:string,v:string) { setForm(f=>({...f,[k]:v})) }
+  function updM(k:string,v:any)  { setMod(m=>({...m,[k]:v}))  }
+
+  const inputStyle = { width:'100%', padding:'12px 16px', fontSize:14, color:T.dark, background:T.off, border:`2px solid ${T.nude}`, borderRadius:T.r12, outline:'none', fontFamily:T.fontSans, transition:'border-color 0.2s', boxSizing:'border-box' as const }
 
   return (
     <div className="anim-fade">
@@ -858,18 +923,14 @@ function ProfileTab({ profile, onSave }: { profile: Profile|null, onSave:()=>voi
 
       {/* Photo */}
       <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:24, marginBottom:20 }}>
-        <PhotoCropper
-          value={photo}
-          onChange={setPhoto}
-          onUpload={uploadPhoto}
-        />
+        <PhotoCropper value={photo} onChange={setPhoto} onUpload={uploadPhoto}/>
       </div>
 
-      {/* Form */}
-      <form onSubmit={save} style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:24 }}>
+      {/* Info form */}
+      <form onSubmit={save} style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:24, marginBottom:20 }}>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
           {[['name','Nome completo','Dra. Ana Beatriz Silva'],['crm','CRM / CRO / CRP','CRP 06/12345'],['whatsapp','WhatsApp','(11) 99999-9999'],['instagram','Instagram','@usuario'],['city','Cidade','São Paulo'],['state','Estado','SP']].map(([k,l,p])=>(
-            <div key={k} style={{ gridColumn: ['city','state'].includes(k)?undefined:undefined }}>
+            <div key={k}>
               <label style={{ display:'block', fontSize:13, fontWeight:600, color:T.dark, marginBottom:6 }}>{l}</label>
               <InputF value={(form as any)[k]} onChange={(v:string)=>upd(k,v)} placeholder={p} maxLen={k==='state'?2:undefined}/>
             </div>
@@ -888,7 +949,7 @@ function ProfileTab({ profile, onSave }: { profile: Profile|null, onSave:()=>voi
         <div style={{ marginTop:4 }}>
           <label style={{ display:'block', fontSize:13, fontWeight:600, color:T.dark, marginBottom:6 }}>Bio</label>
           <textarea rows={4} value={form.bio} onChange={e=>upd('bio',e.target.value)}
-            style={{ width:'100%', padding:'12px 16px', fontSize:14, color:T.dark, background:T.off, border:`2px solid ${T.nude}`, borderRadius:T.r12, outline:'none', resize:'vertical', fontFamily:T.fontSans, transition:'border-color 0.2s' }}
+            style={{ ...inputStyle, resize:'vertical' }}
             onFocus={e=>e.target.style.borderColor=T.sage} onBlur={e=>e.target.style.borderColor=T.nude}/>
         </div>
         <button type="submit" disabled={saving} style={{ marginTop:20, width:'100%', padding:'14px', fontSize:15, fontWeight:700, color:T.cream, background:saved?T.sage:T.dark, border:'none', borderRadius:T.r14, cursor:'pointer', fontFamily:T.fontSans, transition:'background 0.2s' }}>
@@ -896,8 +957,90 @@ function ProfileTab({ profile, onSave }: { profile: Profile|null, onSave:()=>voi
         </button>
       </form>
 
+      {/* ── MODALIDADES ── */}
+      <form onSubmit={saveModality} style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:24, marginBottom:20 }}>
+        <h2 style={{ fontFamily:T.fontSerif, fontSize:19, color:T.dark, margin:'0 0 4px' }}>Modalidades de Atendimento</h2>
+        <p style={{ fontSize:13, color:T.muted, margin:'0 0 20px' }}>Configure como você atende e os valores cobrados. Tudo é opcional.</p>
+
+        {/* Presencial */}
+        <div style={{ border:`2px solid ${mod.in_person ? T.sage : T.nude}`, borderRadius:T.r16, padding:20, marginBottom:14, transition:'border-color 0.2s' }}>
+          <label style={{ display:'flex', alignItems:'center', gap:12, cursor:'pointer', marginBottom: mod.in_person ? 20 : 0 }}>
+            <div onClick={()=>updM('in_person',!mod.in_person)}
+              style={{ width:22, height:22, borderRadius:6, border:`2px solid ${mod.in_person?T.sage:T.nude}`, background:mod.in_person?T.sage:'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, cursor:'pointer', transition:'all 0.15s' }}>
+              {mod.in_person && <span style={{ color:'#fff', fontSize:13, lineHeight:1 }}>✓</span>}
+            </div>
+            <div>
+              <span style={{ fontSize:15, fontWeight:700, color:T.dark }}>📍 Atendimento Presencial</span>
+              {!mod.in_person && <span style={{ fontSize:12, color:T.muted, marginLeft:8 }}>Clique para ativar</span>}
+            </div>
+          </label>
+          {mod.in_person && (
+            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+              <div>
+                <label style={{ display:'block', fontSize:12, fontWeight:600, color:T.muted, marginBottom:6 }}>Endereço do consultório (opcional)</label>
+                <input value={mod.clinic_address} onChange={e=>updM('clinic_address',e.target.value)}
+                  placeholder="Rua das Flores, 123 — Sala 4"
+                  style={inputStyle}
+                  onFocus={e=>e.currentTarget.style.borderColor=T.sage} onBlur={e=>e.currentTarget.style.borderColor=T.nude}/>
+              </div>
+              <div>
+                <label style={{ display:'block', fontSize:12, fontWeight:600, color:T.muted, marginBottom:6 }}>Valor da consulta presencial (opcional)</label>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{ fontSize:14, fontWeight:600, color:T.muted, whiteSpace:'nowrap' }}>R$</span>
+                  <input value={mod.presential_price} onChange={e=>updM('presential_price',e.target.value)}
+                    placeholder="180,00"
+                    style={{ ...inputStyle, width:'auto', flex:1 }}
+                    onFocus={e=>e.currentTarget.style.borderColor=T.sage} onBlur={e=>e.currentTarget.style.borderColor=T.nude}/>
+                </div>
+                <p style={{ fontSize:11, color:T.muted, margin:'5px 0 0' }}>Se não preenchido, o valor não aparece na sua página.</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Online */}
+        <div style={{ border:`2px solid ${mod.online ? T.sage : T.nude}`, borderRadius:T.r16, padding:20, marginBottom:20, transition:'border-color 0.2s' }}>
+          <label style={{ display:'flex', alignItems:'center', gap:12, cursor:'pointer', marginBottom: mod.online ? 20 : 0 }}>
+            <div onClick={()=>updM('online',!mod.online)}
+              style={{ width:22, height:22, borderRadius:6, border:`2px solid ${mod.online?T.sage:T.nude}`, background:mod.online?T.sage:'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, cursor:'pointer', transition:'all 0.15s' }}>
+              {mod.online && <span style={{ color:'#fff', fontSize:13, lineHeight:1 }}>✓</span>}
+            </div>
+            <div>
+              <span style={{ fontSize:15, fontWeight:700, color:T.dark }}>💻 Atendimento Online</span>
+              {!mod.online && <span style={{ fontSize:12, color:T.muted, marginLeft:8 }}>Clique para ativar</span>}
+            </div>
+          </label>
+          {mod.online && (
+            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+              <div>
+                <label style={{ display:'block', fontSize:12, fontWeight:600, color:T.muted, marginBottom:6 }}>Plataforma utilizada</label>
+                <select value={mod.online_platform} onChange={e=>updM('online_platform',e.target.value)}
+                  style={{ ...inputStyle, cursor:'pointer' }}>
+                  {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ display:'block', fontSize:12, fontWeight:600, color:T.muted, marginBottom:6 }}>Valor da consulta online (opcional)</label>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{ fontSize:14, fontWeight:600, color:T.muted, whiteSpace:'nowrap' }}>R$</span>
+                  <input value={mod.online_price} onChange={e=>updM('online_price',e.target.value)}
+                    placeholder="150,00"
+                    style={{ ...inputStyle, width:'auto', flex:1 }}
+                    onFocus={e=>e.currentTarget.style.borderColor=T.sage} onBlur={e=>e.currentTarget.style.borderColor=T.nude}/>
+                </div>
+                <p style={{ fontSize:11, color:T.muted, margin:'5px 0 0' }}>Se não preenchido, o valor não aparece na sua página.</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <button type="submit" disabled={savingM} style={{ width:'100%', padding:'14px', fontSize:15, fontWeight:700, color:T.cream, background:savedM?T.sage:T.dark, border:'none', borderRadius:T.r14, cursor:'pointer', fontFamily:T.fontSans, transition:'background 0.2s' }}>
+          {savedM ? '✓ Modalidades salvas!' : savingM ? 'Salvando...' : 'Salvar modalidades'}
+        </button>
+      </form>
+
       {profile && (
-        <div style={{ marginTop:16, background:T.sageG, border:`1px solid ${T.sageP}`, borderRadius:T.r16, padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <div style={{ marginTop:4, background:T.sageG, border:`1px solid ${T.sageP}`, borderRadius:T.r16, padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
           <div>
             <p style={{ fontWeight:600, color:T.sage, fontSize:14, margin:0 }}>Sua página pública</p>
             <p style={{ fontSize:12, color:T.mid, margin:0 }}>organizaplusapp.com.br/p/{profile.slug}</p>

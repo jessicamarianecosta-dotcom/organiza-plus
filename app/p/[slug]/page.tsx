@@ -102,6 +102,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
   const [agendaBlocks, setAgendaBlocks] = useState<AgendaBlock[]>([])
   const [schedBreaks, setSchedBreaks]   = useState<ScheduleBreak[]>([])
   const [step, setStep]         = useState<'pick'|'form'|'done'>('pick')
+  const [selModality, setSelModality] = useState<'online'|'presencial'|null>(null)
   const [clientName, setCN]     = useState('')
   const [clientPhone, setCP]    = useState('')
   const [clientEmail, setCE]    = useState('')
@@ -134,6 +135,13 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
       track(p.id, 'page_view')
     })
   }, [slug])
+
+  // Auto-set modality for single-modality profiles
+  useEffect(() => {
+    if (!profile) return
+    if (profile.online && !profile.in_person) setSelModality('online')
+    else if (!profile.online && profile.in_person) setSelModality('presencial')
+  }, [profile])
 
   useEffect(() => {
     if (!profile || !selDate) return
@@ -186,10 +194,19 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
     if (!profile||!selDate||!selTime) return
     setSub(true)
     setBookError('')
+
+    const apptPrice = selModality === 'online' ? profile.online_price
+      : selModality === 'presencial' ? profile.presential_price
+      : null
+    const fmtPrice = apptPrice ? `R$ ${apptPrice.toLocaleString('pt-BR',{minimumFractionDigits:2})}` : undefined
+    const modalityLabel = selModality === 'online' ? 'Online' : selModality === 'presencial' ? 'Presencial' : undefined
+
     const { error } = await supabase.from('appointments').insert({
       professional_id:profile.id, client_name:clientName, client_phone:clientPhone,
       client_email:clientEmail||null, notes:notes||null,
       appt_date:selDate, appt_time:selTime+':00',
+      appointment_type: selModality,
+      appointment_price: apptPrice,
     })
     if (!error) {
       track(profile.id, 'booking_completed')
@@ -197,20 +214,19 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
       // Notify professional via WhatsApp about new booking
       if (profile.whatsapp) {
         fetch('/api/whatsapp', { method:'POST', headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({ type:'new_booking', professional_phone:profile.whatsapp, professional_name:profile.name, client_name:clientName, client_phone:clientPhone, appt_date:selDate, appt_time:selTime }) })
+          body:JSON.stringify({ type:'new_booking', professional_phone:profile.whatsapp, professional_name:profile.name, client_name:clientName, client_phone:clientPhone, appt_date:selDate, appt_time:selTime, modality:modalityLabel, price:fmtPrice }) })
       }
 
       // Notify professional via email about new booking
       if ((profile as any).email) {
         fetch('/api/email', { method:'POST', headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({ type:'new_booking', to:(profile as any).email, client:clientName, phone:clientPhone, date:selDate, time:selTime, notes:notes||undefined }) })
+          body:JSON.stringify({ type:'new_booking', to:(profile as any).email, client:clientName, phone:clientPhone, date:selDate, time:selTime, notes:notes||undefined, modality:modalityLabel, price:fmtPrice }) })
       }
 
       // Notify client that booking was received (awaiting confirmation — NOT confirmed yet)
       if (clientEmail) {
-        const modality = profile.online && !profile.in_person ? 'Online' : !profile.online && profile.in_person ? 'Presencial' : 'Online ou Presencial'
         fetch('/api/email', { method:'POST', headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({ type:'booking_received', to:clientEmail, client:clientName, professional:profile.name, date:selDate, time:selTime, modality }) })
+          body:JSON.stringify({ type:'booking_received', to:clientEmail, client:clientName, professional:profile.name, date:selDate, time:selTime, modality:modalityLabel, price:fmtPrice }) })
       }
 
       setStep('done')
@@ -620,6 +636,12 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
                 <div style={{ width:80, height:80, borderRadius:'50%', background:th.glow, border:`2px solid ${th.pale}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:38, margin:'0 auto 20px', animation:'float 2s ease-in-out infinite' }}>✅</div>
                 <h3 style={{ fontFamily:T.fontSerif, fontSize:28, color:T.dark, margin:'0 0 10px' }}>Agendamento confirmado!</h3>
                 <p style={{ fontSize:15, color:T.muted, marginBottom:6 }}>📅 <strong>{selDate}</strong> às <strong>{selTime}</strong></p>
+                {selModality && (
+                  <p style={{ fontSize:14, color:T.muted, marginBottom:6 }}>
+                    {selModality==='online'?'💻 Consulta Online':'📍 Consulta Presencial'}
+                    {(() => { const p = selModality==='online'?profile?.online_price:profile?.presential_price; return p ? ` · R$ ${p.toLocaleString('pt-BR',{minimumFractionDigits:2})}` : '' })()}
+                  </p>
+                )}
                 {clientEmail && <p style={{ fontSize:14, color:T.muted, marginBottom:28 }}>Confirmação enviada para <strong>{clientEmail}</strong></p>}
                 <div style={{ background:th.glow, border:`1px solid ${th.pale}`, borderRadius:T.r16, padding:'16px 20px', maxWidth:360, margin:'0 auto 28px', fontSize:14, color:th.mid, lineHeight:1.6 }}>
                   {tmpl?.booking.confirmMsg || 'Em breve você receberá uma confirmação. Qualquer dúvida, fale pelo WhatsApp.'}
@@ -630,7 +652,12 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
                   </a>
                 )}
                 <br/>
-                <button onClick={()=>{setStep('pick');setSelDate(null);setSelTime(null);setCN('');setCP('');setCE('');setNotes('')}}
+                <button onClick={()=>{
+                  setStep('pick');setSelDate(null);setSelTime(null);setCN('');setCP('');setCE('');setNotes('')
+                  if (profile?.online && !profile?.in_person) setSelModality('online')
+                  else if (!profile?.online && profile?.in_person) setSelModality('presencial')
+                  else setSelModality(null)
+                }}
                   style={{ marginTop:16, color:th.primary, fontSize:13, fontWeight:600, background:'none', border:'none', cursor:'pointer', fontFamily:T.fontSans }}>
                   Fazer outro agendamento →
                 </button>
@@ -683,8 +710,46 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
                   </div>
                 ) : (
                   <>
+                    {/* ── Modality selector (shown when both modes active) ── */}
+                    {profile.online && profile.in_person && (
+                      <div style={{ marginBottom:24 }}>
+                        <p style={{ fontSize:12, fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>
+                          Como deseja ser atendido?
+                        </p>
+                        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                          <button type="button" onClick={()=>{setSelModality('presencial');setSelDate(null);setSelTime(null)}}
+                            style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px', borderRadius:T.r14, border:`2px solid ${selModality==='presencial'?th.primary:T.nude}`, background:selModality==='presencial'?th.glow:'transparent', cursor:'pointer', fontFamily:T.fontSans, transition:'all 0.15s', width:'100%' }}>
+                            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                              <span style={{ fontSize:24 }}>📍</span>
+                              <div style={{ textAlign:'left' }}>
+                                <p style={{ fontWeight:700, fontSize:15, color:T.dark, margin:0 }}>Presencial</p>
+                                {profile.clinic_address && <p style={{ fontSize:12, color:T.muted, margin:0 }}>{profile.clinic_address}</p>}
+                              </div>
+                            </div>
+                            {profile.presential_price && profile.presential_price > 0 && (
+                              <span style={{ fontSize:15, fontWeight:700, color:th.primary, flexShrink:0 }}>R$ {profile.presential_price.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>
+                            )}
+                          </button>
+                          <button type="button" onClick={()=>{setSelModality('online');setSelDate(null);setSelTime(null)}}
+                            style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px', borderRadius:T.r14, border:`2px solid ${selModality==='online'?th.primary:T.nude}`, background:selModality==='online'?th.glow:'transparent', cursor:'pointer', fontFamily:T.fontSans, transition:'all 0.15s', width:'100%' }}>
+                            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                              <span style={{ fontSize:24 }}>💻</span>
+                              <div style={{ textAlign:'left' }}>
+                                <p style={{ fontWeight:700, fontSize:15, color:T.dark, margin:0 }}>Online</p>
+                                {profile.online_platform && <p style={{ fontSize:12, color:T.muted, margin:0 }}>via {profile.online_platform}</p>}
+                              </div>
+                            </div>
+                            {profile.online_price && profile.online_price > 0 && (
+                              <span style={{ fontSize:15, fontWeight:700, color:th.primary, flexShrink:0 }}>R$ {profile.online_price.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>
+                            )}
+                          </button>
+                        </div>
+                        {selModality && <div style={{ marginTop:20, borderTop:`1px solid ${T.nude}` }}/>}
+                      </div>
+                    )}
+
                     {/* ── Monthly calendar ───────────────────────────────── */}
-                    <CalPicker
+                    {(!profile.online || !profile.in_person || selModality) && <CalPicker
                       avail={avail}
                       agendaBlocks={agendaBlocks}
                       selDate={selDate}
@@ -695,7 +760,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
                       onPrev={prevMonth}
                       onNext={nextMonth}
                       th={th}
-                    />
+                    />}
 
                     {/* ── Time slots ─────────────────────────────────────── */}
                     {selDate && (
@@ -749,8 +814,14 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
             <div>
               <p style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.3)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>Atendimento</p>
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                {profile.online    && <p style={{ fontSize:13, color:'rgba(255,255,255,0.5)', margin:0, display:'flex', alignItems:'center', gap:6 }}><Monitor size={12}/> Online (via Google Meet)</p>}
-                {profile.in_person && <p style={{ fontSize:13, color:'rgba(255,255,255,0.5)', margin:0, display:'flex', alignItems:'center', gap:6 }}><Heart size={12}/> Presencial</p>}
+                {profile.online && (
+                  <p style={{ fontSize:13, color:'rgba(255,255,255,0.5)', margin:0, display:'flex', alignItems:'center', gap:6 }}>
+                    <Monitor size={12}/> Online{profile.online_platform?` (via ${profile.online_platform})`:''}{profile.online_price&&profile.online_price>0?` · R$ ${profile.online_price.toLocaleString('pt-BR',{minimumFractionDigits:2})}`:''}</p>
+                )}
+                {profile.in_person && (
+                  <p style={{ fontSize:13, color:'rgba(255,255,255,0.5)', margin:0, display:'flex', alignItems:'center', gap:6 }}>
+                    <Heart size={12}/> Presencial{profile.presential_price&&profile.presential_price>0?` · R$ ${profile.presential_price.toLocaleString('pt-BR',{minimumFractionDigits:2})}`:''}</p>
+                )}
               </div>
             </div>
             <div>

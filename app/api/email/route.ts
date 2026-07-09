@@ -118,6 +118,7 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
         { label: '📅 Data:', value: d.date },
         { label: '🕐 Horário:', value: d.time },
         ...(d.modality ? [{ label: '📍 Modalidade:', value: d.modality }] : []),
+        ...(d.price ? [{ label: '💰 Valor:', value: d.price }] : []),
       ])}
       <div style="background:#FFF8E6;border:1px solid #F5D878;border-radius:12px;padding:14px 18px;margin:16px 0">
         <p style="color:#92700A;font-size:13px;margin:0;line-height:1.6">⏳ <strong>Status: Aguardando confirmação.</strong> Você receberá um e-mail assim que o profissional confirmar sua consulta.</p>
@@ -138,6 +139,7 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
         { label: '📅 Data:', value: d.date },
         { label: '🕐 Horário:', value: d.time },
         { label: '📍 Modalidade:', value: d.modality || 'A combinar' },
+        ...(d.price ? [{ label: '💰 Valor:', value: d.price }] : []),
         ...(d.location ? [{ label: '🏠 Local / Link:', value: d.location }] : []),
       ])}
       <div style="background:#EAF3EC;border-radius:12px;padding:14px 18px;margin:16px 0">
@@ -159,6 +161,8 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
         { label: '📞 Telefone:', value: d.phone || 'Não informado' },
         { label: '📅 Data:', value: d.date },
         { label: '🕐 Horário:', value: d.time },
+        ...(d.modality ? [{ label: '📍 Modalidade:', value: d.modality }] : []),
+        ...(d.price ? [{ label: '💰 Valor:', value: d.price }] : []),
         ...(d.notes ? [{ label: '📝 Obs:', value: d.notes }] : []),
       ])}
       <a href="https://organizaplusapp.com.br/dashboard"

@@ -22,6 +22,11 @@ export type Profile = {
   plan_active: boolean
   crm_cro_crp: string | null
   instagram: string | null
+  // modality & pricing
+  online_platform: string | null
+  online_price: number | null
+  presential_price: number | null
+  clinic_address: string | null
   created_at: string
 }
 
@@ -47,6 +52,8 @@ export type Appointment = {
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed'
   notified_wpp: boolean
   confirmed_at: string | null
+  appointment_type: 'online' | 'presencial' | null
+  appointment_price: number | null
   created_at: string
 }
 
