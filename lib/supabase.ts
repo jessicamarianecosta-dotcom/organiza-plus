@@ -89,3 +89,12 @@ export type ScheduleBreak = {
   description: string | null
   created_at: string
 }
+
+export type WhatsAppSettings = {
+  phone_number_id: string
+  business_account_id: string
+  verify_token: string | null
+  is_connected: boolean
+  has_token: boolean
+  updated_at: string
+}

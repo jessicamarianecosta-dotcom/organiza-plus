@@ -59,6 +59,7 @@ function DashboardContent() {
   const [meetingLink, setMeetingLink] = useState('')
   const [mlError, setMlError] = useState('')
   const [editingLink, setEditingLink] = useState<{id:string,value:string}|null>(null)
+  const [waConnected, setWaConnected] = useState<boolean|null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -75,6 +76,9 @@ function DashboardContent() {
       setAppointments(a || [])
       setHasSchedule((schedCount || 0) > 0)
       setLoading(false)
+      fetch('/api/whatsapp/settings').then(r=>r.json()).then(d => {
+        if (d?.settings != null) setWaConnected(d.settings.is_connected ?? false)
+      }).catch(()=>{})
       if (params.get('payment') === 'success') setToast('🎉 Pagamento confirmado! Plano ativado.')
     } catch {
       router.push('/login')
@@ -372,6 +376,14 @@ function DashboardContent() {
               onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='rgba(255,255,255,0.32)'}}>
               <Globe size={14}/> Minha página <ExternalLink size={11}/>
             </Link>
+          )}
+          {waConnected !== null && (
+            <div onClick={()=>setTab('perfil')} style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 12px', borderRadius:T.r10, fontSize:11, color:'rgba(255,255,255,0.35)', cursor:'pointer', transition:'all 0.15s', margin:'2px 0' }}
+              onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.05)';e.currentTarget.style.color=waConnected?'#86efac':'#fca5a5'}}
+              onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='rgba(255,255,255,0.35)'}}>
+              <span style={{ fontSize:7 }}>{waConnected ? '🟢' : '🔴'}</span>
+              WhatsApp {waConnected ? 'Conectado' : 'Desconectado'}
+            </div>
           )}
           <button onClick={logout} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderRadius:T.r12, fontSize:12, fontWeight:500, color:'rgba(255,255,255,0.32)', background:'none', border:'none', cursor:'pointer', textAlign:'left', width:'100%', transition:'all 0.15s' }}
             onMouseEnter={e=>{e.currentTarget.style.background='rgba(239,68,68,0.12)';e.currentTarget.style.color='#f87171'}}
@@ -752,7 +764,7 @@ function DashboardContent() {
         {tab==='horarios' && <AvailabilityTab profile={profile}/>}
 
         {/* ── TAB: PERFIL ── */}
-        {tab==='perfil' && <ProfileTab profile={profile} onSave={load}/>}
+        {tab==='perfil' && <ProfileTab profile={profile} onSave={load} onWaStatusChange={setWaConnected}/>}
       </main>
     </div>
   )
@@ -981,7 +993,7 @@ function parsePrice(s: string): number | null {
   return isNaN(n) || n <= 0 ? null : n
 }
 
-function ProfileTab({ profile, onSave }: { profile: Profile|null, onSave:()=>void }) {
+function ProfileTab({ profile, onSave, onWaStatusChange }: { profile: Profile|null, onSave:()=>void, onWaStatusChange:(v:boolean|null)=>void }) {
   const [form, setForm] = useState({ name:'', bio:'', whatsapp:'', city:'', state:'', specialties:'', crm:'', instagram:'' })
   const [saving,  setSaving]  = useState(false)
   const [saved,   setSaved]   = useState(false)
@@ -994,6 +1006,16 @@ function ProfileTab({ profile, onSave }: { profile: Profile|null, onSave:()=>voi
     online_price: '', presential_price: '',
     clinic_name: '', clinic_address: '', clinic_maps_link: '',
   })
+  const [waLoading, setWaLoading] = useState(false)
+  const [waSettings, setWaSettings] = useState<{ phone_number_id:string; business_account_id:string; verify_token:string|null; is_connected:boolean; has_token:boolean; updated_at:string }|null>(null)
+  const [waForm, setWaForm] = useState({ phone_number_id:'', business_account_id:'', access_token:'', verify_token:'' })
+  const [waSaving, setWaSaving] = useState(false)
+  const [waSaved, setWaSaved] = useState(false)
+  const [waError, setWaError] = useState('')
+  const [waTestPhone, setWaTestPhone] = useState('')
+  const [waTestResult, setWaTestResult] = useState<{ok:boolean,error?:string}|null>(null)
+  const [waTestLoading, setWaTestLoading] = useState(false)
+  const [waTestOpen, setWaTestOpen] = useState(false)
 
   useEffect(() => {
     if (!profile) return
@@ -1010,6 +1032,17 @@ function ProfileTab({ profile, onSave }: { profile: Profile|null, onSave:()=>voi
       clinic_maps_link: profile.clinic_maps_link  || '',
     })
   }, [profile])
+
+  useEffect(() => {
+    setWaLoading(true)
+    fetch('/api/whatsapp/settings').then(r=>r.json()).then(d => {
+      if (d?.settings) {
+        setWaSettings(d.settings)
+        setWaForm(f=>({ ...f, phone_number_id: d.settings.phone_number_id||'', business_account_id: d.settings.business_account_id||'', verify_token: d.settings.verify_token||'' }))
+      }
+      setWaLoading(false)
+    }).catch(()=>setWaLoading(false))
+  }, [])
 
   async function uploadPhoto(file: File): Promise<string> {
     const fd = new FormData(); fd.append('file', file)
@@ -1043,6 +1076,44 @@ function ProfileTab({ profile, onSave }: { profile: Profile|null, onSave:()=>voi
       clinic_maps_link: mod.in_person && mod.clinic_maps_link ? mod.clinic_maps_link : null,
     }).eq('id', profile.id)
     setSavingM(false); setSavedM(true); onSave(); setTimeout(()=>setSavedM(false),2500)
+  }
+
+  async function saveWa(e: React.FormEvent) {
+    e.preventDefault()
+    if (!waForm.phone_number_id || !waForm.business_account_id || !waForm.access_token) {
+      setWaError('Phone Number ID, Business Account ID e Access Token são obrigatórios.')
+      return
+    }
+    setWaSaving(true); setWaError('')
+    const res = await fetch('/api/whatsapp/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(waForm) })
+    const data = await res.json()
+    if (!data.ok) { setWaError(data.error || 'Erro ao salvar.'); setWaSaving(false); return }
+    setWaSaved(true); setWaSaving(false)
+    const r2 = await fetch('/api/whatsapp/settings')
+    const d2 = await r2.json()
+    if (d2?.settings) { setWaSettings(d2.settings); onWaStatusChange(d2.settings.is_connected) }
+    setTimeout(()=>setWaSaved(false),2500)
+  }
+
+  async function disconnectWa() {
+    await fetch('/api/whatsapp/settings', { method:'DELETE' })
+    setWaSettings(null)
+    setWaForm({ phone_number_id:'', business_account_id:'', access_token:'', verify_token:'' })
+    setWaTestResult(null); setWaTestOpen(false)
+    onWaStatusChange(null)
+  }
+
+  async function testWa() {
+    if (!waTestPhone.trim()) return
+    setWaTestLoading(true); setWaTestResult(null)
+    const res = await fetch('/api/whatsapp/test', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ phone: waTestPhone.trim() }) })
+    const data = await res.json()
+    setWaTestResult({ ok: data.ok, error: data.error })
+    setWaTestLoading(false)
+    if (data.ok !== waSettings?.is_connected) {
+      setWaSettings(s => s ? { ...s, is_connected: !!data.ok } : s)
+      onWaStatusChange(!!data.ok)
+    }
   }
 
   function upd(k:string,v:string) { setForm(f=>({...f,[k]:v})) }
@@ -1186,6 +1257,98 @@ function ProfileTab({ profile, onSave }: { profile: Profile|null, onSave:()=>voi
           {savedM ? '✓ Modalidades salvas!' : savingM ? 'Salvando...' : 'Salvar modalidades'}
         </button>
       </form>
+
+      {/* ── WHATSAPP BUSINESS ── */}
+      <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:24, marginBottom:20 }}>
+        <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:16 }}>
+          <div>
+            <h2 style={{ fontFamily:T.fontSerif, fontSize:19, color:T.dark, margin:'0 0 4px' }}>WhatsApp Business</h2>
+            <p style={{ fontSize:13, color:T.muted, margin:0 }}>Conecte sua conta Meta para enviar notificações automáticas aos pacientes.</p>
+          </div>
+          {waSettings && (
+            <span style={{ flexShrink:0, marginLeft:12, fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:T.r100, background:waSettings.is_connected?T.sageG:T.redL, color:waSettings.is_connected?T.sage:T.red }}>
+              {waSettings.is_connected ? '🟢 Conectado' : '🔴 Desconectado'}
+            </span>
+          )}
+        </div>
+
+        {waLoading ? (
+          <p style={{ fontSize:13, color:T.muted }}>Carregando...</p>
+        ) : (
+          <form onSubmit={saveWa} style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            <div>
+              <label style={{ display:'block', fontSize:13, fontWeight:600, color:T.dark, marginBottom:6 }}>Phone Number ID <span style={{ color:T.red }}>*</span></label>
+              <input value={waForm.phone_number_id} onChange={e=>setWaForm(f=>({...f,phone_number_id:e.target.value}))} placeholder="123456789012345"
+                style={inputStyle} onFocus={e=>e.currentTarget.style.borderColor=T.sage} onBlur={e=>e.currentTarget.style.borderColor=T.nude}/>
+              <p style={{ fontSize:11, color:T.muted, margin:'4px 0 0' }}>Meta Business Suite → WhatsApp → Configuração da API</p>
+            </div>
+            <div>
+              <label style={{ display:'block', fontSize:13, fontWeight:600, color:T.dark, marginBottom:6 }}>Business Account ID <span style={{ color:T.red }}>*</span></label>
+              <input value={waForm.business_account_id} onChange={e=>setWaForm(f=>({...f,business_account_id:e.target.value}))} placeholder="987654321098765"
+                style={inputStyle} onFocus={e=>e.currentTarget.style.borderColor=T.sage} onBlur={e=>e.currentTarget.style.borderColor=T.nude}/>
+            </div>
+            <div>
+              <label style={{ display:'block', fontSize:13, fontWeight:600, color:T.dark, marginBottom:6 }}>
+                Access Token (Permanente) <span style={{ color:T.red }}>*</span>
+                {waSettings?.has_token && <span style={{ fontSize:11, fontWeight:500, color:T.sage, marginLeft:8 }}>✓ Salvo</span>}
+              </label>
+              <input type="password" value={waForm.access_token} onChange={e=>setWaForm(f=>({...f,access_token:e.target.value}))}
+                placeholder={waSettings?.has_token ? '••••••••••••••••' : 'EAAxxxxxx...'}
+                style={inputStyle} onFocus={e=>e.currentTarget.style.borderColor=T.sage} onBlur={e=>e.currentTarget.style.borderColor=T.nude}/>
+              <p style={{ fontSize:11, color:T.muted, margin:'4px 0 0' }}>Use um token permanente. Nunca é exibido após salvar.</p>
+            </div>
+            <div>
+              <label style={{ display:'block', fontSize:13, fontWeight:600, color:T.dark, marginBottom:6 }}>Verify Token <span style={{ fontSize:12, fontWeight:400, color:T.muted }}>— opcional (Webhook)</span></label>
+              <input value={waForm.verify_token} onChange={e=>setWaForm(f=>({...f,verify_token:e.target.value}))} placeholder="meu-token-secreto"
+                style={inputStyle} onFocus={e=>e.currentTarget.style.borderColor=T.sage} onBlur={e=>e.currentTarget.style.borderColor=T.nude}/>
+            </div>
+
+            {waError && <p style={{ fontSize:13, color:T.red, fontWeight:500, margin:0 }}>⚠ {waError}</p>}
+
+            <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+              <button type="submit" disabled={waSaving} style={{ flex:'1 1 140px', padding:'12px 16px', fontSize:14, fontWeight:700, color:T.cream, background:waSaved?T.sage:T.dark, border:'none', borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans, transition:'background 0.2s' }}>
+                {waSaved ? '✓ Credenciais salvas!' : waSaving ? 'Salvando...' : 'Salvar credenciais'}
+              </button>
+              {waSettings && (
+                <button type="button" onClick={()=>setWaTestOpen(o=>!o)}
+                  style={{ padding:'12px 16px', fontSize:14, fontWeight:600, color:T.blue, background:T.blueL, border:`1.5px solid rgba(59,130,246,0.15)`, borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans }}>
+                  🔍 Testar conexão
+                </button>
+              )}
+              {waSettings && (
+                <button type="button" onClick={disconnectWa}
+                  style={{ padding:'12px 16px', fontSize:14, fontWeight:600, color:T.red, background:T.redL, border:`1.5px solid rgba(239,68,68,0.15)`, borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans }}>
+                  Desconectar
+                </button>
+              )}
+            </div>
+
+            {waTestOpen && waSettings && (
+              <div style={{ background:T.off, border:`1.5px solid ${T.nude}`, borderRadius:T.r14, padding:'16px 18px' }}>
+                <p style={{ fontSize:13, fontWeight:700, color:T.dark, margin:'0 0 12px' }}>Enviar mensagem de teste</p>
+                <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'flex-end' }}>
+                  <div style={{ flex:'1 1 160px' }}>
+                    <label style={{ display:'block', fontSize:12, fontWeight:600, color:T.muted, marginBottom:6 }}>Número de destino</label>
+                    <input value={waTestPhone} onChange={e=>setWaTestPhone(e.target.value)} placeholder="(11) 99999-9999"
+                      style={inputStyle} onFocus={e=>e.currentTarget.style.borderColor=T.sage} onBlur={e=>e.currentTarget.style.borderColor=T.nude}/>
+                  </div>
+                  <button type="button" onClick={testWa} disabled={waTestLoading || !waTestPhone.trim()}
+                    style={{ padding:'12px 20px', fontSize:14, fontWeight:700, color:T.cream, background:T.sage, border:'none', borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans, whiteSpace:'nowrap' }}>
+                    {waTestLoading ? 'Enviando...' : '📤 Enviar teste'}
+                  </button>
+                </div>
+                {waTestResult && (
+                  <div style={{ marginTop:12, padding:'10px 14px', borderRadius:T.r10, background:waTestResult.ok?T.sageG:T.redL, border:`1px solid ${waTestResult.ok?T.sageP:'rgba(239,68,68,0.2)'}` }}>
+                    <p style={{ fontSize:13, fontWeight:600, color:waTestResult.ok?T.sage:T.red, margin:0 }}>
+                      {waTestResult.ok ? '✅ Mensagem enviada! Verifique o WhatsApp.' : `❌ Falha: ${waTestResult.error || 'Erro desconhecido'}`}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </form>
+        )}
+      </div>
 
       {profile && (
         <div style={{ marginTop:4, background:T.sageG, border:`1px solid ${T.sageP}`, borderRadius:T.r16, padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
