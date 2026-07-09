@@ -48,7 +48,11 @@ function DashboardContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [toast, setToast] = useState('')
   const [hasSchedule, setHasSchedule] = useState(false)
-  const [notifErrors, setNotifErrors] = useState<Record<string, string>>({}) // appointmentId → error msg
+  const [notifErrors, setNotifErrors] = useState<Record<string, string>>({})
+  const [confirmModal, setConfirmModal] = useState<Appointment|null>(null)
+  const [meetingLink, setMeetingLink] = useState('')
+  const [mlError, setMlError] = useState('')
+  const [editingLink, setEditingLink] = useState<{id:string,value:string}|null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -73,11 +77,14 @@ function DashboardContent() {
 
   useEffect(() => { load() }, [load])
 
-  async function updateStatus(id: string, status: string) {
+  async function updateStatus(id: string, status: string, mLink?: string) {
     const updates: Record<string, unknown> = { status }
-    if (status === 'confirmed') updates.confirmed_at = new Date().toISOString()
+    if (status === 'confirmed') {
+      updates.confirmed_at = new Date().toISOString()
+      if (mLink) updates.meeting_link = mLink
+    }
     await supabase.from('appointments').update(updates).eq('id', id)
-    setAppointments(prev => prev.map(a => a.id===id ? {...a, status: status as any} : a))
+    setAppointments(prev => prev.map(a => a.id===id ? {...a, status: status as any, ...(mLink ? {meeting_link: mLink} : {})} : a))
 
     if (status === 'confirmed') {
       const appt = appointments.find(a => a.id === id)
@@ -86,47 +93,55 @@ function DashboardContent() {
       const modality = appt.appointment_type === 'online' ? 'Online'
         : appt.appointment_type === 'presencial' ? 'Presencial'
         : profile.online && !profile.in_person ? 'Online'
-        : !profile.online && profile.in_person ? 'Presencial' : 'Online ou Presencial'
+        : !profile.online && profile.in_person ? 'Presencial' : undefined
       const fmtApptPrice = appt.appointment_price ? `R$ ${appt.appointment_price.toLocaleString('pt-BR',{minimumFractionDigits:2})}` : undefined
 
       const errors: string[] = []
 
-      // Send confirmation email to client
       if (appt.client_email) {
-        const emailRes = await fetch('/api/email', { method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({
-            type: 'appointment_confirmed',
-            to: appt.client_email,
-            appointment_id: id,
-            professional_id: profile.id,
-            client: appt.client_name,
-            professional: profile.name,
-            date: appt.appt_date,
-            time: appt.appt_time.slice(0,5),
-            modality,
-            price: fmtApptPrice,
-          })
-        })
+        const emailPayload: Record<string, unknown> = {
+          type: 'appointment_confirmed',
+          to: appt.client_email,
+          appointment_id: id,
+          professional_id: profile.id,
+          client: appt.client_name,
+          professional: profile.name,
+          date: appt.appt_date,
+          time: appt.appt_time.slice(0,5),
+          modality,
+          price: fmtApptPrice,
+        }
+        if (modality === 'Online' && mLink) emailPayload.meeting_link = mLink
+        if (modality === 'Presencial') {
+          if (profile.clinic_name) emailPayload.clinic_name = profile.clinic_name
+          if (profile.clinic_address) emailPayload.clinic_address = profile.clinic_address
+          if (profile.clinic_maps_link) emailPayload.clinic_maps_link = profile.clinic_maps_link
+        }
+        const emailRes = await fetch('/api/email', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(emailPayload) })
         const emailData = await emailRes.json()
         if (!emailData.ok) errors.push(`E-mail: ${emailData.error || 'falha'}`)
       }
 
-      // Send WhatsApp confirmation to client
       if (appt.client_phone) {
-        const wppRes = await fetch('/api/whatsapp', { method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({
-            type: 'confirmed',
-            appointment_id: id,
-            professional_id: profile.id,
-            professional_name: profile.name,
-            client_name: appt.client_name,
-            client_phone: appt.client_phone,
-            appt_date: appt.appt_date,
-            appt_time: appt.appt_time.slice(0,5),
-            modality,
-            price: fmtApptPrice,
-          })
-        })
+        const wppPayload: Record<string, unknown> = {
+          type: 'confirmed',
+          appointment_id: id,
+          professional_id: profile.id,
+          professional_name: profile.name,
+          client_name: appt.client_name,
+          client_phone: appt.client_phone,
+          appt_date: appt.appt_date,
+          appt_time: appt.appt_time.slice(0,5),
+          modality,
+          price: fmtApptPrice,
+        }
+        if (modality === 'Online' && mLink) wppPayload.meeting_link = mLink
+        if (modality === 'Presencial') {
+          if (profile.clinic_name) wppPayload.clinic_name = profile.clinic_name
+          if (profile.clinic_address) wppPayload.address = profile.clinic_address
+          if (profile.clinic_maps_link) wppPayload.maps_link = profile.clinic_maps_link
+        }
+        const wppRes = await fetch('/api/whatsapp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(wppPayload) })
         const wppData = await wppRes.json()
         if (!wppData.sent && process.env.NEXT_PUBLIC_WPP_ENABLED === 'true') {
           errors.push(`WhatsApp: ${wppData.error || 'não enviado'}`)
@@ -140,11 +155,56 @@ function DashboardContent() {
         setToast('✅ Consulta confirmada e paciente notificado!')
       }
     }
+
+    if (status === 'cancelled') {
+      const appt = appointments.find(a => a.id === id)
+      if (!appt || !profile) return
+      const modality = appt.appointment_type === 'online' ? 'Online' : appt.appointment_type === 'presencial' ? 'Presencial' : undefined
+      if (appt.client_email) {
+        await fetch('/api/email', { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ type:'appointment_cancelled', to:appt.client_email, appointment_id:id, professional_id:profile.id, client:appt.client_name, professional:profile.name, date:appt.appt_date, time:appt.appt_time.slice(0,5), modality })
+        })
+      }
+      if (appt.client_phone) {
+        await fetch('/api/whatsapp', { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ type:'cancelled', appointment_id:id, professional_id:profile.id, professional_name:profile.name, client_name:appt.client_name, client_phone:appt.client_phone, appt_date:appt.appt_date, appt_time:appt.appt_time.slice(0,5) })
+        })
+      }
+      setToast('🚫 Agendamento cancelado. Paciente notificado.')
+    }
+  }
+
+  async function updateMeetingLink(id: string, link: string) {
+    await supabase.from('appointments').update({ meeting_link: link }).eq('id', id)
+    setAppointments(prev => prev.map(a => a.id === id ? {...a, meeting_link: link} : a))
+    setEditingLink(null)
+    const appt = appointments.find(a => a.id === id)
+    if (!appt || !profile) return
+    if (appt.client_email) {
+      await fetch('/api/email', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ type:'meeting_link_updated', to:appt.client_email, appointment_id:id, professional_id:profile.id, client:appt.client_name, professional:profile.name, date:appt.appt_date, time:appt.appt_time.slice(0,5), meeting_link:link })
+      })
+    }
+    if (appt.client_phone) {
+      await fetch('/api/whatsapp', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ type:'link_updated', appointment_id:id, professional_id:profile.id, professional_name:profile.name, client_name:appt.client_name, client_phone:appt.client_phone, appt_date:appt.appt_date, appt_time:appt.appt_time.slice(0,5), meeting_link:link })
+      })
+    }
+    setToast('🔗 Link atualizado e paciente notificado!')
+  }
+
+  function onClickConfirm(a: Appointment) {
+    if (a.appointment_type === 'online') {
+      setConfirmModal(a); setMeetingLink(a.meeting_link || ''); setMlError('')
+    } else {
+      updateStatus(a.id, 'confirmed')
+    }
   }
 
   async function retryNotification(id: string) {
     setNotifErrors(prev => { const n = {...prev}; delete n[id]; return n })
-    await updateStatus(id, 'confirmed')
+    const appt = appointments.find(a => a.id === id)
+    await updateStatus(id, 'confirmed', appt?.meeting_link || undefined)
   }
 
   async function logout() { await supabase.auth.signOut(); router.push('/') }
@@ -200,6 +260,47 @@ function DashboardContent() {
   return (
     <div style={{ minHeight:'100vh', background:T.off, fontFamily:T.fontSans, color:T.dark }}>
       <GlobalStyles/>
+
+      {/* Confirmation modal for online appointments */}
+      {confirmModal && (
+        <div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.55)', display:'flex', alignItems:'center', justifyContent:'center', padding:16, backdropFilter:'blur(4px)' }}>
+          <div style={{ background:T.white, borderRadius:T.r20, padding:28, width:'100%', maxWidth:460, boxShadow:T.shadowXl }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20 }}>
+              <div>
+                <h2 style={{ fontFamily:T.fontSerif, fontSize:20, color:T.dark, margin:0 }}>Confirmar consulta online</h2>
+                <p style={{ fontSize:13, color:T.muted, margin:'4px 0 0' }}>{confirmModal.client_name} · {confirmModal.appt_date} às {confirmModal.appt_time.slice(0,5)}</p>
+              </div>
+              <button onClick={()=>setConfirmModal(null)} style={{ background:'none', border:'none', cursor:'pointer', color:T.muted, padding:4 }}><X size={18}/></button>
+            </div>
+            <div style={{ background:T.blueL, borderRadius:T.r14, padding:'14px 16px', marginBottom:20 }}>
+              <p style={{ fontSize:13, color:T.blue, margin:0, fontWeight:500, lineHeight:1.5 }}>💻 Para confirmar uma consulta online, informe o link da reunião. O paciente receberá este link automaticamente.</p>
+            </div>
+            <div style={{ marginBottom:20 }}>
+              <label style={{ display:'block', fontSize:13, fontWeight:700, color:T.dark, marginBottom:8 }}>Link da reunião <span style={{ color:T.red }}>*</span></label>
+              <input
+                value={meetingLink}
+                onChange={e=>{setMeetingLink(e.target.value);setMlError('')}}
+                placeholder="https://meet.google.com/abc-defg-hij"
+                style={{ width:'100%', padding:'12px 16px', fontSize:14, color:T.dark, background:T.off, border:`2px solid ${mlError?T.red:T.nude}`, borderRadius:T.r12, outline:'none', fontFamily:T.fontSans, boxSizing:'border-box' }}
+                onFocus={e=>e.target.style.borderColor=mlError?T.red:T.sage}
+                onBlur={e=>e.target.style.borderColor=mlError?T.red:T.nude}
+              />
+              {mlError && <p style={{ fontSize:12, color:T.red, margin:'6px 0 0', fontWeight:500 }}>{mlError}</p>}
+            </div>
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={()=>setConfirmModal(null)} style={{ flex:1, padding:13, fontSize:14, fontWeight:600, color:T.muted, background:T.off, border:`1px solid ${T.nude}`, borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans }}>Cancelar</button>
+              <button onClick={async()=>{
+                if (!meetingLink.trim()) { setMlError('Informe o link da reunião.'); return }
+                const id = confirmModal.id
+                setConfirmModal(null)
+                await updateStatus(id, 'confirmed', meetingLink.trim())
+              }} style={{ flex:2, padding:13, fontSize:14, fontWeight:700, color:T.cream, background:T.sage, border:'none', borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans }}>
+                ✅ Confirmar e enviar link
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast */}
       {toast && (
@@ -387,7 +488,7 @@ function DashboardContent() {
                                     <span style={{ fontSize:10, fontWeight:700, padding:'3px 9px', borderRadius:T.r100, background:sc.bg, color:sc.color, flexShrink:0 }}>{sc.label}</span>
                                     {a.status==='pending' && (
                                       <div style={{ display:'flex', gap:5, flexShrink:0 }}>
-                                        <button onClick={()=>updateStatus(a.id,'confirmed')} style={{ background:T.sage, color:T.cream, border:'none', borderRadius:T.r8, padding:'5px 10px', cursor:'pointer', fontSize:12, fontWeight:600 }}>✓ Confirmar</button>
+                                        <button onClick={()=>onClickConfirm(a)} style={{ background:T.sage, color:T.cream, border:'none', borderRadius:T.r8, padding:'5px 10px', cursor:'pointer', fontSize:12, fontWeight:600 }}>✓ Confirmar</button>
                                         <button onClick={()=>updateStatus(a.id,'cancelled')} style={{ background:T.redL, color:T.red, border:'none', borderRadius:T.r8, padding:'5px 10px', cursor:'pointer', fontSize:12, fontWeight:600 }}>✗</button>
                                       </div>
                                     )}
@@ -395,6 +496,23 @@ function DashboardContent() {
                                       <button onClick={()=>updateStatus(a.id,'completed')} style={{ background:T.blueL, color:T.blue, border:'none', borderRadius:T.r8, padding:'5px 10px', cursor:'pointer', fontSize:11, fontWeight:600, flexShrink:0 }}>Concluir</button>
                                     )}
                                   </div>
+                                  {a.status==='confirmed' && a.appointment_type==='online' && (
+                                    <div style={{ padding:'8px 12px', background:T.blueL, border:`1px solid ${T.blue}22`, borderRadius:T.r10, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                                      {editingLink?.id===a.id ? (
+                                        <>
+                                          <input value={editingLink.value} onChange={e=>setEditingLink({id:a.id,value:e.target.value})}
+                                            style={{ flex:1, minWidth:180, padding:'5px 10px', fontSize:12, border:`1px solid ${T.blue}44`, borderRadius:T.r8, outline:'none', fontFamily:T.fontSans, background:T.white, color:T.dark }}/>
+                                          <button onClick={()=>updateMeetingLink(a.id,editingLink.value.trim())} style={{ background:T.blue, color:'#fff', border:'none', borderRadius:T.r8, padding:'5px 10px', cursor:'pointer', fontSize:11, fontWeight:700, flexShrink:0 }}>Salvar</button>
+                                          <button onClick={()=>setEditingLink(null)} style={{ background:'none', border:'none', color:T.muted, cursor:'pointer', fontSize:11, flexShrink:0 }}>Cancelar</button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <span style={{ fontSize:12, color:T.blue, flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>🔗 {a.meeting_link || 'Link da reunião não definido'}</span>
+                                          <button onClick={()=>setEditingLink({id:a.id,value:a.meeting_link||''})} style={{ background:T.blue, color:'#fff', border:'none', borderRadius:T.r8, padding:'4px 10px', cursor:'pointer', fontSize:11, fontWeight:600, flexShrink:0 }}>Editar link</button>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
                                   {notifErrors[a.id] && (
                                     <div style={{ padding:'8px 12px', background:'#FEF2F2', border:'1px solid #FECACA', borderRadius:T.r10, fontSize:12, color:'#DC2626', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
                                       <span>⚠ Falha ao notificar: {notifErrors[a.id]}</span>
@@ -573,13 +691,18 @@ function DashboardContent() {
                     </div>
                     {a.notes && <p style={{ fontSize:12, color:T.mid, fontStyle:'italic', margin:'2px 0 0' }}>"{a.notes}"</p>}
                   </div>
-                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', justifyContent:'flex-end' }}>
                     <StatusBadge status={a.status}/>
                     {a.status==='pending' && <>
-                      <button onClick={()=>updateStatus(a.id,'confirmed')} style={{ background:T.sage, color:T.cream, border:'none', borderRadius:T.r10, padding:'6px 11px', cursor:'pointer', fontSize:12, fontWeight:600 }}>✓</button>
+                      <button onClick={()=>onClickConfirm(a)} style={{ background:T.sage, color:T.cream, border:'none', borderRadius:T.r10, padding:'6px 11px', cursor:'pointer', fontSize:12, fontWeight:600 }}>✓</button>
                       <button onClick={()=>updateStatus(a.id,'cancelled')} style={{ background:T.redL, color:T.red, border:'none', borderRadius:T.r10, padding:'6px 11px', cursor:'pointer', fontSize:12, fontWeight:600 }}>✗</button>
                     </>}
-                    {a.status==='confirmed' && <button onClick={()=>updateStatus(a.id,'completed')} style={{ background:T.blueL, color:T.blue, border:'none', borderRadius:T.r10, padding:'6px 11px', cursor:'pointer', fontSize:12, fontWeight:600 }}>Concluir</button>}
+                    {a.status==='confirmed' && <>
+                      {a.appointment_type==='online' && (
+                        <button onClick={()=>setEditingLink({id:a.id,value:a.meeting_link||''})} style={{ background:T.blueL, color:T.blue, border:'none', borderRadius:T.r10, padding:'6px 11px', cursor:'pointer', fontSize:11, fontWeight:600 }}>🔗 Link</button>
+                      )}
+                      <button onClick={()=>updateStatus(a.id,'completed')} style={{ background:T.blueL, color:T.blue, border:'none', borderRadius:T.r10, padding:'6px 11px', cursor:'pointer', fontSize:12, fontWeight:600 }}>Concluir</button>
+                    </>}
                   </div>
                 </div>
               ))}
@@ -862,7 +985,8 @@ function ProfileTab({ profile, onSave }: { profile: Profile|null, onSave:()=>voi
   const [mod, setMod] = useState({
     online: false, in_person: false,
     online_platform: 'Google Meet',
-    online_price: '', presential_price: '', clinic_address: '',
+    online_price: '', presential_price: '',
+    clinic_name: '', clinic_address: '', clinic_maps_link: '',
   })
 
   useEffect(() => {
@@ -870,12 +994,14 @@ function ProfileTab({ profile, onSave }: { profile: Profile|null, onSave:()=>voi
     setForm({ name:profile.name||'', bio:profile.bio||'', whatsapp:profile.whatsapp||'', city:profile.city||'', state:profile.state||'', specialties:(profile.specialties||[]).join(', '), crm:profile.crm_cro_crp||'', instagram:profile.instagram||'' })
     setPhoto(profile.photo_url||'')
     setMod({
-      online:           profile.online        ?? false,
-      in_person:        profile.in_person     ?? false,
-      online_platform:  profile.online_platform  || 'Google Meet',
+      online:           profile.online            ?? false,
+      in_person:        profile.in_person         ?? false,
+      online_platform:  profile.online_platform   || 'Google Meet',
       online_price:     profile.online_price      ? String(profile.online_price).replace('.',',') : '',
       presential_price: profile.presential_price  ? String(profile.presential_price).replace('.',',') : '',
+      clinic_name:      profile.clinic_name       || '',
       clinic_address:   profile.clinic_address    || '',
+      clinic_maps_link: profile.clinic_maps_link  || '',
     })
   }, [profile])
 
@@ -906,7 +1032,9 @@ function ProfileTab({ profile, onSave }: { profile: Profile|null, onSave:()=>voi
       online_platform:  mod.online && mod.online_platform ? mod.online_platform : null,
       online_price:     mod.online ? parsePrice(mod.online_price) : null,
       presential_price: mod.in_person ? parsePrice(mod.presential_price) : null,
+      clinic_name:      mod.in_person && mod.clinic_name ? mod.clinic_name : null,
       clinic_address:   mod.in_person && mod.clinic_address ? mod.clinic_address : null,
+      clinic_maps_link: mod.in_person && mod.clinic_maps_link ? mod.clinic_maps_link : null,
     }).eq('id', profile.id)
     setSavingM(false); setSavedM(true); onSave(); setTimeout(()=>setSavedM(false),2500)
   }
@@ -977,9 +1105,23 @@ function ProfileTab({ profile, onSave }: { profile: Profile|null, onSave:()=>voi
           {mod.in_person && (
             <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
               <div>
-                <label style={{ display:'block', fontSize:12, fontWeight:600, color:T.muted, marginBottom:6 }}>Endereço do consultório (opcional)</label>
+                <label style={{ display:'block', fontSize:12, fontWeight:600, color:T.muted, marginBottom:6 }}>Nome do consultório / clínica (opcional)</label>
+                <input value={mod.clinic_name} onChange={e=>updM('clinic_name',e.target.value)}
+                  placeholder="Clínica Bem-Estar"
+                  style={inputStyle}
+                  onFocus={e=>e.currentTarget.style.borderColor=T.sage} onBlur={e=>e.currentTarget.style.borderColor=T.nude}/>
+              </div>
+              <div>
+                <label style={{ display:'block', fontSize:12, fontWeight:600, color:T.muted, marginBottom:6 }}>Endereço completo (opcional)</label>
                 <input value={mod.clinic_address} onChange={e=>updM('clinic_address',e.target.value)}
-                  placeholder="Rua das Flores, 123 — Sala 4"
+                  placeholder="Rua das Flores, 123, Sala 4 — Jardim Paulista, São Paulo/SP, CEP 01401-001"
+                  style={inputStyle}
+                  onFocus={e=>e.currentTarget.style.borderColor=T.sage} onBlur={e=>e.currentTarget.style.borderColor=T.nude}/>
+              </div>
+              <div>
+                <label style={{ display:'block', fontSize:12, fontWeight:600, color:T.muted, marginBottom:6 }}>Link do Google Maps (opcional)</label>
+                <input value={mod.clinic_maps_link} onChange={e=>updM('clinic_maps_link',e.target.value)}
+                  placeholder="https://maps.google.com/..."
                   style={inputStyle}
                   onFocus={e=>e.currentTarget.style.borderColor=T.sage} onBlur={e=>e.currentTarget.style.borderColor=T.nude}/>
               </div>

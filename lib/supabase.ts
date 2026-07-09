@@ -26,7 +26,9 @@ export type Profile = {
   online_platform: string | null
   online_price: number | null
   presential_price: number | null
+  clinic_name: string | null
   clinic_address: string | null
+  clinic_maps_link: string | null
   created_at: string
 }
 
@@ -54,6 +56,7 @@ export type Appointment = {
   confirmed_at: string | null
   appointment_type: 'online' | 'presencial' | null
   appointment_price: number | null
+  meeting_link: string | null
   created_at: string
 }
 

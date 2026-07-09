@@ -18,10 +18,26 @@ function msgNewBooking(d: { client_name: string; client_phone: string; appt_date
   return `✅ *Novo Agendamento — Organiza+*\n\n👤 *Paciente:* ${d.client_name}\n📱 *Telefone:* ${d.client_phone}\n📅 *Data:* ${d.appt_date}\n🕐 *Horário:* ${d.appt_time}${modalityLine}${priceLine}\n\n_Acesse seu painel para confirmar._`
 }
 
-function msgConfirmed(d: { client_name: string; professional_name: string; appt_date: string; appt_time: string; modality?: string; price?: string }) {
+function msgConfirmed(d: { client_name: string; professional_name: string; appt_date: string; appt_time: string; modality?: string; price?: string; meeting_link?: string; clinic_name?: string; address?: string; maps_link?: string }) {
   const modalityLine = d.modality ? `\n📍 *Modalidade:* ${d.modality}` : ''
   const priceLine = d.price ? `\n💰 *Valor:* ${d.price}` : ''
-  return `✅ *Consulta confirmada!*\n\nOlá, *${d.client_name}*! Sua consulta com *${d.professional_name}* foi confirmada.\n\n📅 *Data:* ${d.appt_date}\n🕐 *Horário:* ${d.appt_time}${modalityLine}${priceLine}\n\n_Em caso de imprevisto, avise com antecedência. Até breve!_ 🌿`
+  let locationLines = ''
+  if (d.modality === 'Online' && d.meeting_link) {
+    locationLines = `\n\n🔗 *Link da reunião:* ${d.meeting_link}`
+  } else if (d.modality === 'Presencial') {
+    if (d.clinic_name) locationLines += `\n\n🏥 *Local:* ${d.clinic_name}`
+    if (d.address) locationLines += `\n📍 *Endereço:* ${d.address}`
+    if (d.maps_link) locationLines += `\n🗺️ *Google Maps:* ${d.maps_link}`
+  }
+  return `✅ *Consulta confirmada!*\n\nOlá, *${d.client_name}*! Sua consulta com *${d.professional_name}* foi confirmada.\n\n📅 *Data:* ${d.appt_date}\n🕐 *Horário:* ${d.appt_time}${modalityLine}${priceLine}${locationLines}\n\n_Em caso de imprevisto, avise com antecedência. Até breve!_ 🌿`
+}
+
+function msgCancelled(d: { client_name: string; professional_name: string; appt_date: string; appt_time: string }) {
+  return `❌ *Agendamento cancelado*\n\nOlá, *${d.client_name}*. Infelizmente *${d.professional_name}* precisou cancelar sua consulta.\n\n📅 *Data:* ${d.appt_date}\n🕐 *Horário:* ${d.appt_time}\n\n_Para remarcar, entre em contato diretamente com o profissional._`
+}
+
+function msgLinkUpdated(d: { client_name: string; professional_name: string; appt_date: string; appt_time: string; meeting_link: string }) {
+  return `🔗 *Link da consulta atualizado*\n\nOlá, *${d.client_name}*! O link da sua consulta com *${d.professional_name}* foi atualizado.\n\n📅 *Data:* ${d.appt_date}\n🕐 *Horário:* ${d.appt_time}\n🔗 *Novo link:* ${d.meeting_link}\n\n_Guarde este link. O anterior não está mais válido._`
 }
 
 async function sendWpp(phone: string, msg: string): Promise<{ sent: boolean; waLink: string; error?: string }> {
@@ -83,7 +99,7 @@ export async function POST(req: NextRequest) {
       // new_booking fields (notify professional)
       professional_phone,
       professional_name,
-      // confirmed fields (notify client)
+      // client-facing fields
       client_phone,
       client_name,
       // common
@@ -91,14 +107,18 @@ export async function POST(req: NextRequest) {
       appt_time,
       modality,
       price,
+      // confirmation details
+      meeting_link,
+      clinic_name,
+      address,
+      maps_link,
     } = body
 
     const supabase = buildSupabase()
 
     if (type === 'confirmed') {
-      // Notify CLIENT that professional confirmed their appointment
       if (!client_phone) return NextResponse.json({ error: 'Missing client_phone' }, { status: 400 })
-      const msg = msgConfirmed({ client_name, professional_name, appt_date, appt_time, modality, price })
+      const msg = msgConfirmed({ client_name, professional_name, appt_date, appt_time, modality, price, meeting_link, clinic_name, address, maps_link })
       const { sent, waLink, error } = await sendWpp(client_phone, msg)
 
       await log(supabase, {
@@ -109,7 +129,46 @@ export async function POST(req: NextRequest) {
         event_type: 'appointment_confirmed',
         status: sent ? 'sent' : (process.env.WHATSAPP_API_URL ? 'failed' : 'skipped'),
         error_message: error || null,
-        metadata: { appt_date, appt_time, modality, price },
+        metadata: { appt_date, appt_time, modality, price, meeting_link },
+      })
+
+      return NextResponse.json({ success: true, sent, waLink })
+    }
+
+    if (type === 'cancelled') {
+      if (!client_phone) return NextResponse.json({ error: 'Missing client_phone' }, { status: 400 })
+      const msg = msgCancelled({ client_name, professional_name, appt_date, appt_time })
+      const { sent, waLink, error } = await sendWpp(client_phone, msg)
+
+      await log(supabase, {
+        appointment_id,
+        professional_id,
+        channel: 'whatsapp',
+        recipient: client_phone,
+        event_type: 'appointment_cancelled',
+        status: sent ? 'sent' : (process.env.WHATSAPP_API_URL ? 'failed' : 'skipped'),
+        error_message: error || null,
+        metadata: { appt_date, appt_time },
+      })
+
+      return NextResponse.json({ success: true, sent, waLink })
+    }
+
+    if (type === 'link_updated') {
+      if (!client_phone) return NextResponse.json({ error: 'Missing client_phone' }, { status: 400 })
+      if (!meeting_link) return NextResponse.json({ error: 'Missing meeting_link' }, { status: 400 })
+      const msg = msgLinkUpdated({ client_name, professional_name, appt_date, appt_time, meeting_link })
+      const { sent, waLink, error } = await sendWpp(client_phone, msg)
+
+      await log(supabase, {
+        appointment_id,
+        professional_id,
+        channel: 'whatsapp',
+        recipient: client_phone,
+        event_type: 'meeting_link_updated',
+        status: sent ? 'sent' : (process.env.WHATSAPP_API_URL ? 'failed' : 'skipped'),
+        error_message: error || null,
+        metadata: { meeting_link },
       })
 
       return NextResponse.json({ success: true, sent, waLink })

@@ -104,6 +104,30 @@ function card(rows: { label: string; value: string }[]) {
   </div>`
 }
 
+function locationBlock(d: { modality?: string; meeting_link?: string; clinic_name?: string; clinic_address?: string; clinic_maps_link?: string }) {
+  if (d.modality === 'Online' && d.meeting_link) {
+    return `<div style="background:#E8F0FE;border:1px solid #C5D8FF;border-radius:14px;padding:18px 20px;margin:16px 0">
+      <p style="margin:0 0 10px;color:#1A3A6E;font-size:14px;font-weight:700">🔗 Link da reunião</p>
+      <a href="${d.meeting_link}" style="display:inline-block;background:#1A73E8;color:#ffffff;padding:11px 22px;border-radius:10px;font-size:14px;font-weight:700;text-decoration:none">Entrar na reunião →</a>
+      <p style="margin:10px 0 0;color:#4A6FA5;font-size:12px;word-break:break-all">${d.meeting_link}</p>
+    </div>`
+  }
+  if (d.modality === 'Presencial') {
+    const rows: string[] = []
+    if (d.clinic_name) rows.push(`<p style="margin:0 0 7px;color:#2C3530;font-size:14px"><strong>🏥 Local:</strong> ${d.clinic_name}</p>`)
+    if (d.clinic_address) rows.push(`<p style="margin:0 0 7px;color:#2C3530;font-size:14px"><strong>📍 Endereço:</strong> ${d.clinic_address}</p>`)
+    if (!rows.length) return ''
+    const mapsBtn = d.clinic_maps_link
+      ? `<a href="${d.clinic_maps_link}" style="display:inline-block;margin-top:10px;background:#34A853;color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:700;text-decoration:none">Abrir no Google Maps →</a>`
+      : ''
+    return `<div style="background:#F0F7F1;border:1px solid #C3DFC8;border-radius:14px;padding:18px 20px;margin:16px 0">
+      <p style="margin:0 0 10px;color:#1D4A2A;font-size:14px;font-weight:700">📍 Local do atendimento</p>
+      ${rows.join('')}${mapsBtn}
+    </div>`
+  }
+  return ''
+}
+
 const templates: Record<string, (d: any) => { subject: string; html: string }> = {
 
   // Sent to client right after booking (status = pending)
@@ -138,15 +162,51 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
         { label: '👨‍⚕️ Profissional:', value: d.professional },
         { label: '📅 Data:', value: d.date },
         { label: '🕐 Horário:', value: d.time },
-        { label: '📍 Modalidade:', value: d.modality || 'A combinar' },
+        ...(d.modality ? [{ label: '📍 Modalidade:', value: d.modality }] : []),
         ...(d.price ? [{ label: '💰 Valor:', value: d.price }] : []),
-        ...(d.location ? [{ label: '🏠 Local / Link:', value: d.location }] : []),
       ])}
+      ${locationBlock(d)}
       <div style="background:#EAF3EC;border-radius:12px;padding:14px 18px;margin:16px 0">
         <p style="color:#2C5F3A;font-size:13px;margin:0 0 8px;font-weight:700">📌 Lembre-se:</p>
-        <p style="color:#3A6647;font-size:13px;margin:0;line-height:1.7">• Confirme sua presença com antecedência<br>• Em caso de imprevisto, avise com pelo menos 24h de antecedência<br>• Chegue com alguns minutos de antecedência</p>
+        <p style="color:#3A6647;font-size:13px;margin:0;line-height:1.7">• Em caso de imprevisto, avise com pelo menos 24h de antecedência<br>${d.modality === 'Presencial' ? '• Chegue com alguns minutos de antecedência' : '• Teste o link de acesso com antecedência'}</p>
       </div>
       <p style="color:#8A9690;font-size:13px;margin:12px 0 0;line-height:1.6">Para cancelar ou reagendar, entre em contato diretamente com o profissional.</p>
+    `),
+  }),
+
+  // Sent to client when professional cancels
+  appointment_cancelled: (d) => ({
+    subject: '❌ Agendamento cancelado',
+    html: wrap(`
+      <h2 style="color:#2C3530;margin:0 0 6px;font-size:21px">Agendamento cancelado ❌</h2>
+      <p style="color:#5A6660;margin:0 0 4px;font-size:15px">Olá, <strong>${d.client}</strong>!</p>
+      <p style="color:#5A6660;margin:0 0 16px;font-size:15px">Infelizmente <strong>${d.professional}</strong> precisou cancelar o agendamento abaixo:</p>
+      ${card([
+        { label: '📅 Data:', value: d.date },
+        { label: '🕐 Horário:', value: d.time },
+        ...(d.modality ? [{ label: '📍 Modalidade:', value: d.modality }] : []),
+      ])}
+      <div style="background:#FEF2F2;border:1px solid #FCA5A5;border-radius:12px;padding:14px 18px;margin:16px 0">
+        <p style="color:#991B1B;font-size:13px;margin:0;line-height:1.6">Para reagendar, entre em contato diretamente com o profissional.</p>
+      </div>
+    `),
+  }),
+
+  // Sent to client when professional updates the meeting link
+  meeting_link_updated: (d) => ({
+    subject: '🔗 Link da consulta atualizado',
+    html: wrap(`
+      <h2 style="color:#2C3530;margin:0 0 6px;font-size:21px">Link da consulta atualizado 🔗</h2>
+      <p style="color:#5A6660;margin:0 0 4px;font-size:15px">Olá, <strong>${d.client}</strong>!</p>
+      <p style="color:#5A6660;margin:0 0 16px;font-size:15px"><strong>${d.professional}</strong> atualizou o link da sua consulta.</p>
+      ${card([
+        { label: '📅 Data:', value: d.date },
+        { label: '🕐 Horário:', value: d.time },
+      ])}
+      ${locationBlock({ modality: 'Online', meeting_link: d.meeting_link })}
+      <div style="background:#FFF8E6;border:1px solid #F5D878;border-radius:12px;padding:14px 18px;margin:16px 0">
+        <p style="color:#92700A;font-size:13px;margin:0;line-height:1.6">⚠️ <strong>Atenção:</strong> o link anterior não está mais válido. Use somente o link acima.</p>
+      </div>
     `),
   }),
 
