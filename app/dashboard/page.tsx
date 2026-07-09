@@ -1,6 +1,7 @@
 'use client'
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Script from 'next/script'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -270,6 +271,16 @@ function DashboardContent() {
   return (
     <div style={{ minHeight:'100vh', background:T.off, fontFamily:T.fontSans, color:T.dark }}>
       <GlobalStyles/>
+      <Script
+        src="https://connect.facebook.net/en_US/sdk.js"
+        strategy="lazyOnload"
+        onLoad={() => {
+          const FB = (window as any).FB
+          if (FB && process.env.NEXT_PUBLIC_META_APP_ID) {
+            FB.init({ appId: process.env.NEXT_PUBLIC_META_APP_ID, cookie: true, xfbml: true, version: 'v19.0' })
+          }
+        }}
+      />
 
       {/* Confirmation modal for online appointments */}
       {confirmModal && (
@@ -1008,10 +1019,14 @@ function ProfileTab({ profile, onSave, onWaStatusChange }: { profile: Profile|nu
   })
   const [waLoading, setWaLoading] = useState(false)
   const [waConnected, setWaConnected] = useState(false)
+  const [waStatus, setWaStatus] = useState<string|null>(null)
   const [waPhone, setWaPhone] = useState<string|null>(null)
+  const [waVerifiedName, setWaVerifiedName] = useState<string|null>(null)
+  const [waConnectedAt, setWaConnectedAt] = useState<string|null>(null)
   const [waUpdatedAt, setWaUpdatedAt] = useState<string|null>(null)
   const [waActionLoading, setWaActionLoading] = useState(false)
   const [waTestResult, setWaTestResult] = useState<{ok:boolean,error?:string}|null>(null)
+  const waListenerRef = useRef<((e: MessageEvent) => void) | null>(null)
 
   useEffect(() => {
     if (!profile) return
@@ -1029,14 +1044,20 @@ function ProfileTab({ profile, onSave, onWaStatusChange }: { profile: Profile|nu
     })
   }, [profile])
 
+  function refreshWaStatus() {
+    return fetch('/api/integrations/whatsapp').then(r => r.json()).then(d => {
+      setWaConnected(d?.connected ?? false)
+      setWaStatus(d?.status ?? null)
+      setWaPhone(d?.phone ?? null)
+      setWaVerifiedName(d?.verified_name ?? null)
+      setWaConnectedAt(d?.connected_at ?? null)
+      setWaUpdatedAt(d?.updated_at ?? null)
+    })
+  }
+
   useEffect(() => {
     setWaLoading(true)
-    fetch('/api/integrations/whatsapp').then(r=>r.json()).then(d => {
-      setWaConnected(d?.connected ?? false)
-      setWaPhone(d?.phone ?? null)
-      setWaUpdatedAt(d?.updated_at ?? null)
-      setWaLoading(false)
-    }).catch(()=>setWaLoading(false))
+    refreshWaStatus().catch(() => {}).finally(() => setWaLoading(false))
   }, [])
 
   async function uploadPhoto(file: File): Promise<string> {
@@ -1079,19 +1100,85 @@ function ProfileTab({ profile, onSave, onWaStatusChange }: { profile: Profile|nu
     const d = await res.json()
     if (action === 'test') {
       setWaTestResult({ ok: d.ok, error: d.error })
-    } else {
-      if (d.ok || d.connected !== undefined) {
-        const newConnected = action === 'disconnect' ? false : true
-        setWaConnected(newConnected)
-        onWaStatusChange(newConnected ? true : null)
-        if (newConnected) {
-          const status = await fetch('/api/integrations/whatsapp').then(r=>r.json())
-          setWaPhone(status?.phone ?? null)
-          setWaUpdatedAt(status?.updated_at ?? null)
-        }
-      }
+    } else if (d.ok || d.connected !== undefined) {
+      const nowConnected = action !== 'disconnect'
+      setWaConnected(nowConnected)
+      onWaStatusChange(nowConnected ? true : null)
+      if (nowConnected) await refreshWaStatus().catch(() => {})
     }
     setWaActionLoading(false)
+  }
+
+  function startEmbeddedSignup() {
+    const FB = (window as any).FB
+    if (!FB) {
+      setWaTestResult({ ok: false, error: 'SDK do Facebook não carregado. Recarregue a página.' })
+      return
+    }
+
+    // Remove previous listener if any
+    if (waListenerRef.current) window.removeEventListener('message', waListenerRef.current)
+
+    let signupData: { phone_number_id?: string; waba_id?: string } = {}
+
+    const messageHandler = (event: MessageEvent) => {
+      if (event.origin !== 'https://www.facebook.com') return
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data
+        if (data.type === 'WA_EMBEDDED_SIGNUP') {
+          if (data.event === 'FINISH') {
+            signupData = {
+              phone_number_id: data.data?.phone_number_id,
+              waba_id: data.data?.waba_id,
+            }
+          }
+        }
+      } catch {}
+    }
+    waListenerRef.current = messageHandler
+    window.addEventListener('message', messageHandler)
+
+    FB.login(
+      async (response: any) => {
+        window.removeEventListener('message', messageHandler)
+        waListenerRef.current = null
+
+        if (response.authResponse?.code && signupData.phone_number_id && signupData.waba_id) {
+          setWaActionLoading(true)
+          try {
+            const res = await fetch('/api/integrations/whatsapp/callback', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                code: response.authResponse.code,
+                phone_number_id: signupData.phone_number_id,
+                waba_id: signupData.waba_id,
+              }),
+            })
+            const d = await res.json()
+            if (d.ok) {
+              setWaConnected(true)
+              onWaStatusChange(true)
+              await refreshWaStatus().catch(() => {})
+            } else {
+              setWaTestResult({ ok: false, error: d.error ?? 'Falha ao conectar' })
+            }
+          } catch (err) {
+            setWaTestResult({ ok: false, error: String(err) })
+          } finally {
+            setWaActionLoading(false)
+          }
+        } else if (response.status === 'not_authorized' || !response.authResponse) {
+          // User cancelled or denied — silent, no error shown
+        }
+      },
+      {
+        config_id: process.env.NEXT_PUBLIC_META_CONFIG_ID,
+        response_type: 'code',
+        override_default_response_type: true,
+        extras: { setup: {}, featureName: 'whatsapp_embedded_signup', sessionInfoVersion: 2 },
+      }
+    )
   }
 
   function upd(k:string,v:string) { setForm(f=>({...f,[k]:v})) }
@@ -1242,7 +1329,7 @@ function ProfileTab({ profile, onSave, onWaStatusChange }: { profile: Profile|nu
         <p style={{ fontSize:13, color:T.muted, margin:'0 0 20px' }}>Conecte ferramentas para automatizar a comunicação com seus pacientes.</p>
 
         {/* WhatsApp Business card */}
-        <div style={{ border:`2px solid ${waConnected ? T.sageP : T.nude}`, borderRadius:T.r16, padding:20, transition:'border-color 0.2s' }}>
+        <div style={{ border:`2px solid ${waConnected ? T.sageP : waStatus === 'error' ? 'rgba(239,68,68,0.35)' : T.nude}`, borderRadius:T.r16, padding:20, transition:'border-color 0.2s' }}>
           {waLoading ? (
             <p style={{ fontSize:13, color:T.muted, margin:0 }}>Carregando...</p>
           ) : (profile?.plan !== 'premium' || !profile?.plan_active) ? (
@@ -1273,16 +1360,22 @@ function ProfileTab({ profile, onSave, onWaStatusChange }: { profile: Profile|nu
                 <span style={{ fontSize:11, fontWeight:700, padding:'4px 12px', borderRadius:T.r100, background:T.sageG, color:T.sage }}>🟢 Conectado</span>
               </div>
               <div style={{ background:T.off, borderRadius:T.r12, padding:'14px 16px', marginBottom:16, display:'flex', flexDirection:'column', gap:8 }}>
-                {waPhone && (
+                {(waVerifiedName || waPhone) && (
                   <div style={{ display:'flex', gap:8 }}>
-                    <span style={{ fontSize:13, color:T.muted, minWidth:160 }}>Número conectado</span>
-                    <span style={{ fontSize:13, fontWeight:600, color:T.dark }}>{waPhone}</span>
+                    <span style={{ fontSize:13, color:T.muted, minWidth:160 }}>Conta conectada</span>
+                    <span style={{ fontSize:13, fontWeight:600, color:T.dark }}>{waVerifiedName ?? waPhone}</span>
                   </div>
                 )}
-                {waUpdatedAt && (
+                {waPhone && waVerifiedName && (
                   <div style={{ display:'flex', gap:8 }}>
-                    <span style={{ fontSize:13, color:T.muted, minWidth:160 }}>Última sincronização</span>
-                    <span style={{ fontSize:13, color:T.dark }}>{format(new Date(waUpdatedAt), "dd/MM 'às' HH:mm", { locale: ptBR })}</span>
+                    <span style={{ fontSize:13, color:T.muted, minWidth:160 }}>Número</span>
+                    <span style={{ fontSize:13, color:T.dark }}>{waPhone}</span>
+                  </div>
+                )}
+                {waConnectedAt && (
+                  <div style={{ display:'flex', gap:8 }}>
+                    <span style={{ fontSize:13, color:T.muted, minWidth:160 }}>Conectado em</span>
+                    <span style={{ fontSize:13, color:T.dark }}>{format(new Date(waConnectedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
                   </div>
                 )}
               </div>
@@ -1298,7 +1391,7 @@ function ProfileTab({ profile, onSave, onWaStatusChange }: { profile: Profile|nu
                   style={{ padding:'10px 16px', fontSize:13, fontWeight:600, color:T.blue, background:T.blueL, border:`1.5px solid rgba(59,130,246,0.15)`, borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans }}>
                   {waActionLoading ? '...' : '📤 Enviar teste'}
                 </button>
-                <button onClick={()=>waAction('reconnect')} disabled={waActionLoading}
+                <button onClick={startEmbeddedSignup} disabled={waActionLoading}
                   style={{ padding:'10px 16px', fontSize:13, fontWeight:600, color:T.muted, background:T.off, border:`1.5px solid ${T.nude}`, borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans }}>
                   Reconectar
                 </button>
@@ -1307,6 +1400,24 @@ function ProfileTab({ profile, onSave, onWaStatusChange }: { profile: Profile|nu
                   Desconectar
                 </button>
               </div>
+            </div>
+          ) : waStatus === 'error' ? (
+            /* Token expired / error state */
+            <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:16, flexWrap:'wrap' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                <span style={{ fontSize:28 }}>💬</span>
+                <div>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                    <span style={{ fontSize:15, fontWeight:700, color:T.dark }}>WhatsApp Business</span>
+                    <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:T.r100, background:T.redL, color:T.red }}>⚠️ Token expirado</span>
+                  </div>
+                  <p style={{ fontSize:13, color:T.muted, margin:0 }}>Sua autorização expirou. Reconecte para retomar os envios automáticos.</p>
+                </div>
+              </div>
+              <button onClick={startEmbeddedSignup} disabled={waActionLoading}
+                style={{ flexShrink:0, padding:'11px 22px', fontSize:14, fontWeight:700, color:T.cream, background:T.amber, border:'none', borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans, whiteSpace:'nowrap' }}>
+                {waActionLoading ? 'Aguarde...' : 'Reconectar'}
+              </button>
             </div>
           ) : (
             /* Disconnected state */
@@ -1318,12 +1429,12 @@ function ProfileTab({ profile, onSave, onWaStatusChange }: { profile: Profile|nu
                     <span style={{ fontSize:15, fontWeight:700, color:T.dark }}>WhatsApp Business</span>
                     <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:T.r100, background:T.redL, color:T.red }}>🔴 Não conectado</span>
                   </div>
-                  <p style={{ fontSize:13, color:T.muted, margin:0 }}>Conecte para enviar confirmações e lembretes automáticos aos seus pacientes.</p>
+                  <p style={{ fontSize:13, color:T.muted, margin:0 }}>Conecte seu WhatsApp Business para enviar confirmações e lembretes automáticos.</p>
                 </div>
               </div>
-              <button onClick={()=>waAction('connect')} disabled={waActionLoading}
+              <button onClick={startEmbeddedSignup} disabled={waActionLoading}
                 style={{ flexShrink:0, padding:'11px 22px', fontSize:14, fontWeight:700, color:T.cream, background:T.sage, border:'none', borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans, whiteSpace:'nowrap' }}>
-                {waActionLoading ? 'Conectando...' : '✓ Conectar WhatsApp'}
+                {waActionLoading ? 'Aguarde...' : 'Conectar WhatsApp'}
               </button>
             </div>
           )}

@@ -29,22 +29,25 @@ export async function GET() {
 
   const { data } = await service()
     .from('integrations')
-    .select('status, config_json, updated_at')
+    .select('status, config_json, phone_number, connected_at, updated_at')
     .eq('user_id', user.id)
     .eq('provider', 'whatsapp')
     .single()
 
   if (!data) return NextResponse.json({ connected: false, status: null })
 
+  const cfg = data.config_json as Record<string, unknown> | null
   return NextResponse.json({
     connected: data.status === 'active',
     status: data.status as string,
-    phone: (data.config_json as Record<string, unknown>)?.phone ?? null,
+    phone: data.phone_number ?? cfg?.phone ?? null,
+    verified_name: cfg?.verified_name ?? null,
+    connected_at: data.connected_at as string | null,
     updated_at: data.updated_at as string,
   })
 }
 
-// POST — actions: connect | disconnect | test
+// POST — actions: disconnect | test
 export async function POST(req: NextRequest) {
   const user = await getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -52,36 +55,14 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const { action } = body as { action: string; phone?: string }
 
-  if (action === 'connect' || action === 'reconnect') {
-    const { data: profile } = await service()
-      .from('profiles')
-      .select('plan, plan_active, whatsapp')
-      .eq('id', user.id)
-      .single()
-
-    if (profile?.plan !== 'premium' || !profile.plan_active) {
-      return NextResponse.json({ error: 'Disponível apenas no Plano Pro', upgrade_required: true }, { status: 403 })
-    }
-
-    const { error } = await service()
-      .from('integrations')
-      .upsert({
-        user_id: user.id,
-        provider: 'whatsapp',
-        provider_type: 'meta_cloud',
-        status: 'active',
-        config_json: { phone: profile?.whatsapp ?? null },
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id,provider' })
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ ok: true, connected: true })
-  }
-
   if (action === 'disconnect') {
     await service()
       .from('integrations')
-      .update({ status: 'inactive', updated_at: new Date().toISOString() })
+      .update({
+        status: 'inactive',
+        encrypted_credentials: null,
+        updated_at: new Date().toISOString(),
+      })
       .eq('user_id', user.id)
       .eq('provider', 'whatsapp')
     return NextResponse.json({ ok: true, connected: false })
@@ -116,5 +97,5 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+  return NextResponse.json({ error: 'Ação inválida' }, { status: 400 })
 }
