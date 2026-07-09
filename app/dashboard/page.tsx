@@ -1,7 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import Script from 'next/script'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -10,7 +9,9 @@ import { T, GlobalStyles, Btn, Badge, Input, Alert, ProgressBar } from '@/lib/ds
 import DynamicSpecialties from '@/lib/DynamicSpecialties'
 import PhotoCropper from '@/lib/PhotoCropper'
 import { AgendaBlocksSection, AgendaBlock } from '@/lib/ScheduleConfig'
-import { LayoutDashboard, Calendar, Users, Clock, Settings, Globe, LogOut, TrendingUp, CreditCard, ExternalLink, CheckCircle, XCircle, X, Menu, ChevronRight, Bell } from 'lucide-react'
+import { buildWaLink } from '@/lib/whatsapp'
+import type { WaMessageType, WaData } from '@/lib/whatsapp'
+import { LayoutDashboard, Calendar, Users, Clock, Settings, Globe, LogOut, TrendingUp, CreditCard, ExternalLink, CheckCircle, XCircle, X, Menu, ChevronRight, Bell, MessageCircle } from 'lucide-react'
 
 const DAYS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
 
@@ -57,10 +58,11 @@ function DashboardContent() {
   const [hasSchedule, setHasSchedule] = useState(false)
   const [notifErrors, setNotifErrors] = useState<Record<string, string>>({})
   const [confirmModal, setConfirmModal] = useState<Appointment|null>(null)
+  const [confirmType, setConfirmType] = useState<'presencial'|'online'>('presencial')
   const [meetingLink, setMeetingLink] = useState('')
   const [mlError, setMlError] = useState('')
+  const [cancelModal, setCancelModal] = useState<Appointment|null>(null)
   const [editingLink, setEditingLink] = useState<{id:string,value:string}|null>(null)
-  const [waConnected, setWaConnected] = useState<boolean|null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -77,9 +79,6 @@ function DashboardContent() {
       setAppointments(a || [])
       setHasSchedule((schedCount || 0) > 0)
       setLoading(false)
-      fetch('/api/integrations/whatsapp').then(r=>r.json()).then(d => {
-        if (d?.connected !== undefined) setWaConnected(d.connected)
-      }).catch(()=>{})
       if (params.get('payment') === 'success') setToast('🎉 Pagamento confirmado! Plano ativado.')
     } catch {
       router.push('/login')
@@ -88,7 +87,11 @@ function DashboardContent() {
 
   useEffect(() => { load() }, [load])
 
-  async function updateStatus(id: string, status: string, mLink?: string) {
+  function openWa(phone: string, type: WaMessageType, data: WaData) {
+    window.open(buildWaLink(phone, type, data), '_blank')
+  }
+
+  async function updateStatus(id: string, status: string, mLink?: string, modalityOverride?: string, sendWa?: boolean) {
     const updates: Record<string, unknown> = { status }
     if (status === 'confirmed') {
       updates.confirmed_at = new Date().toISOString()
@@ -101,10 +104,11 @@ function DashboardContent() {
       const appt = appointments.find(a => a.id === id)
       if (!appt || !profile) return
 
-      const modality = appt.appointment_type === 'online' ? 'Online'
+      const modality = modalityOverride
+        || (appt.appointment_type === 'online' ? 'Online'
         : appt.appointment_type === 'presencial' ? 'Presencial'
         : profile.online && !profile.in_person ? 'Online'
-        : !profile.online && profile.in_person ? 'Presencial' : undefined
+        : !profile.online && profile.in_person ? 'Presencial' : undefined)
       const fmtApptPrice = appt.appointment_price ? `R$ ${appt.appointment_price.toLocaleString('pt-BR',{minimumFractionDigits:2})}` : undefined
 
       const errors: string[] = []
@@ -133,37 +137,26 @@ function DashboardContent() {
         if (!emailData.ok) errors.push(`E-mail: ${emailData.error || 'falha'}`)
       }
 
-      if (appt.client_phone) {
-        const wppPayload: Record<string, unknown> = {
-          type: 'confirmed',
-          appointment_id: id,
-          professional_id: profile.id,
-          professional_name: profile.name,
-          client_name: appt.client_name,
-          client_phone: appt.client_phone,
-          appt_date: appt.appt_date,
-          appt_time: appt.appt_time.slice(0,5),
-          modality,
-          price: fmtApptPrice,
-        }
-        if (modality === 'Online' && mLink) wppPayload.meeting_link = mLink
-        if (modality === 'Presencial') {
-          if (profile.clinic_name) wppPayload.clinic_name = profile.clinic_name
-          if (profile.clinic_address) wppPayload.address = profile.clinic_address
-          if (profile.clinic_maps_link) wppPayload.maps_link = profile.clinic_maps_link
-        }
-        const wppRes = await fetch('/api/whatsapp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(wppPayload) })
-        const wppData = await wppRes.json()
-        if (!wppData.sent && process.env.NEXT_PUBLIC_WPP_ENABLED === 'true') {
-          errors.push(`WhatsApp: ${wppData.error || 'não enviado'}`)
-        }
-      }
-
       if (errors.length > 0) {
         setNotifErrors(prev => ({ ...prev, [id]: errors.join(' · ') }))
       } else {
         setNotifErrors(prev => { const n = {...prev}; delete n[id]; return n })
-        setToast('✅ Consulta confirmada e paciente notificado!')
+        setToast('✅ Consulta confirmada! Paciente notificado por e-mail.')
+      }
+
+      if (sendWa && profile.whatsapp && appt.client_phone) {
+        openWa(appt.client_phone, 'confirmed', {
+          client_name: appt.client_name,
+          professional_name: profile.name,
+          appt_date: format(new Date(appt.appt_date+'T12:00'), "dd/MM/yyyy", {locale:ptBR}),
+          appt_time: appt.appt_time.slice(0,5),
+          modality,
+          price: fmtApptPrice,
+          meeting_link: modality === 'Online' ? (mLink || undefined) : undefined,
+          clinic_name: modality === 'Presencial' ? (profile.clinic_name || undefined) : undefined,
+          address: modality === 'Presencial' ? (profile.clinic_address || undefined) : undefined,
+          maps_link: modality === 'Presencial' ? (profile.clinic_maps_link || undefined) : undefined,
+        })
       }
     }
 
@@ -176,12 +169,15 @@ function DashboardContent() {
           body: JSON.stringify({ type:'appointment_cancelled', to:appt.client_email, appointment_id:id, professional_id:profile.id, client:appt.client_name, professional:profile.name, date:appt.appt_date, time:appt.appt_time.slice(0,5), modality })
         })
       }
-      if (appt.client_phone) {
-        await fetch('/api/whatsapp', { method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ type:'cancelled', appointment_id:id, professional_id:profile.id, professional_name:profile.name, client_name:appt.client_name, client_phone:appt.client_phone, appt_date:appt.appt_date, appt_time:appt.appt_time.slice(0,5) })
+      setToast('🚫 Agendamento cancelado.')
+      if (sendWa && profile.whatsapp && appt.client_phone) {
+        openWa(appt.client_phone, 'cancelled', {
+          client_name: appt.client_name,
+          professional_name: profile.name,
+          appt_date: format(new Date(appt.appt_date+'T12:00'), "dd/MM/yyyy", {locale:ptBR}),
+          appt_time: appt.appt_time.slice(0,5),
         })
       }
-      setToast('🚫 Agendamento cancelado. Paciente notificado.')
     }
   }
 
@@ -196,20 +192,31 @@ function DashboardContent() {
         body: JSON.stringify({ type:'meeting_link_updated', to:appt.client_email, appointment_id:id, professional_id:profile.id, client:appt.client_name, professional:profile.name, date:appt.appt_date, time:appt.appt_time.slice(0,5), meeting_link:link })
       })
     }
-    if (appt.client_phone) {
-      await fetch('/api/whatsapp', { method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ type:'link_updated', appointment_id:id, professional_id:profile.id, professional_name:profile.name, client_name:appt.client_name, client_phone:appt.client_phone, appt_date:appt.appt_date, appt_time:appt.appt_time.slice(0,5), meeting_link:link })
+    if (profile.whatsapp && appt.client_phone) {
+      openWa(appt.client_phone, 'link_updated', {
+        client_name: appt.client_name,
+        professional_name: profile.name,
+        appt_date: format(new Date(appt.appt_date+'T12:00'), "dd/MM/yyyy", {locale:ptBR}),
+        appt_time: appt.appt_time.slice(0,5),
+        meeting_link: link,
       })
     }
-    setToast('🔗 Link atualizado e paciente notificado!')
+    setToast('🔗 Link atualizado! WhatsApp aberto para notificar o paciente.')
   }
 
   function onClickConfirm(a: Appointment) {
-    if (a.appointment_type === 'online') {
-      setConfirmModal(a); setMeetingLink(a.meeting_link || ''); setMlError('')
-    } else {
-      updateStatus(a.id, 'confirmed')
-    }
+    const type = a.appointment_type === 'online' ? 'online'
+      : a.appointment_type === 'presencial' ? 'presencial'
+      : profile?.online && !profile?.in_person ? 'online'
+      : 'presencial'
+    setConfirmModal(a)
+    setConfirmType(type as 'presencial'|'online')
+    setMeetingLink(a.meeting_link || '')
+    setMlError('')
+  }
+
+  function onClickCancel(a: Appointment) {
+    setCancelModal(a)
   }
 
   async function retryNotification(id: string) {
@@ -271,52 +278,129 @@ function DashboardContent() {
   return (
     <div style={{ minHeight:'100vh', background:T.off, fontFamily:T.fontSans, color:T.dark }}>
       <GlobalStyles/>
-      <Script
-        src="https://connect.facebook.net/en_US/sdk.js"
-        strategy="lazyOnload"
-        onLoad={() => {
-          const FB = (window as any).FB
-          if (FB && process.env.NEXT_PUBLIC_META_APP_ID) {
-            FB.init({ appId: process.env.NEXT_PUBLIC_META_APP_ID, cookie: true, xfbml: true, version: 'v19.0' })
-          }
-        }}
-      />
-
-      {/* Confirmation modal for online appointments */}
+      {/* ── Confirmation modal ── */}
       {confirmModal && (
         <div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.55)', display:'flex', alignItems:'center', justifyContent:'center', padding:16, backdropFilter:'blur(4px)' }}>
-          <div style={{ background:T.white, borderRadius:T.r20, padding:28, width:'100%', maxWidth:460, boxShadow:T.shadowXl }}>
+          <div style={{ background:T.white, borderRadius:T.r20, padding:28, width:'100%', maxWidth:480, boxShadow:T.shadowXl }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20 }}>
               <div>
-                <h2 style={{ fontFamily:T.fontSerif, fontSize:20, color:T.dark, margin:0 }}>Confirmar consulta online</h2>
-                <p style={{ fontSize:13, color:T.muted, margin:'4px 0 0' }}>{confirmModal.client_name} · {confirmModal.appt_date} às {confirmModal.appt_time.slice(0,5)}</p>
+                <h2 style={{ fontFamily:T.fontSerif, fontSize:20, color:T.dark, margin:0 }}>Confirmar agendamento</h2>
+                <p style={{ fontSize:13, color:T.muted, margin:'4px 0 0' }}>{confirmModal.client_name}</p>
               </div>
               <button onClick={()=>setConfirmModal(null)} style={{ background:'none', border:'none', cursor:'pointer', color:T.muted, padding:4 }}><X size={18}/></button>
             </div>
-            <div style={{ background:T.blueL, borderRadius:T.r14, padding:'14px 16px', marginBottom:20 }}>
-              <p style={{ fontSize:13, color:T.blue, margin:0, fontWeight:500, lineHeight:1.5 }}>💻 Para confirmar uma consulta online, informe o link da reunião. O paciente receberá este link automaticamente.</p>
+
+            {/* Appointment summary */}
+            <div style={{ background:T.off, borderRadius:T.r14, padding:'14px 16px', marginBottom:20, display:'flex', flexDirection:'column', gap:6 }}>
+              <div style={{ display:'flex', gap:10 }}>
+                <span style={{ fontSize:13, color:T.muted, minWidth:70 }}>Paciente</span>
+                <span style={{ fontSize:13, fontWeight:600, color:T.dark }}>{confirmModal.client_name}</span>
+              </div>
+              <div style={{ display:'flex', gap:10 }}>
+                <span style={{ fontSize:13, color:T.muted, minWidth:70 }}>Data</span>
+                <span style={{ fontSize:13, fontWeight:600, color:T.dark }}>{format(new Date(confirmModal.appt_date+'T12:00'), "dd/MM/yyyy", {locale:ptBR})}</span>
+              </div>
+              <div style={{ display:'flex', gap:10 }}>
+                <span style={{ fontSize:13, color:T.muted, minWidth:70 }}>Horário</span>
+                <span style={{ fontSize:13, fontWeight:600, color:T.dark }}>{confirmModal.appt_time.slice(0,5)}</span>
+              </div>
             </div>
-            <div style={{ marginBottom:20 }}>
-              <label style={{ display:'block', fontSize:13, fontWeight:700, color:T.dark, marginBottom:8 }}>Link da reunião <span style={{ color:T.red }}>*</span></label>
-              <input
-                value={meetingLink}
-                onChange={e=>{setMeetingLink(e.target.value);setMlError('')}}
-                placeholder="https://meet.google.com/abc-defg-hij"
-                style={{ width:'100%', padding:'12px 16px', fontSize:14, color:T.dark, background:T.off, border:`2px solid ${mlError?T.red:T.nude}`, borderRadius:T.r12, outline:'none', fontFamily:T.fontSans, boxSizing:'border-box' }}
-                onFocus={e=>e.target.style.borderColor=mlError?T.red:T.sage}
-                onBlur={e=>e.target.style.borderColor=mlError?T.red:T.nude}
-              />
-              {mlError && <p style={{ fontSize:12, color:T.red, margin:'6px 0 0', fontWeight:500 }}>{mlError}</p>}
+
+            {/* Type selector */}
+            <div style={{ marginBottom:18 }}>
+              <p style={{ fontSize:12, fontWeight:700, color:T.muted, margin:'0 0 8px', textTransform:'uppercase', letterSpacing:'0.06em' }}>Tipo de atendimento</p>
+              <div style={{ display:'flex', gap:10 }}>
+                {(['presencial','online'] as const).map(t => (
+                  <button key={t} onClick={()=>{setConfirmType(t);setMlError('')}}
+                    style={{ flex:1, padding:'10px 14px', borderRadius:T.r12, border:`2px solid ${confirmType===t?T.sage:T.nude}`, background:confirmType===t?T.sageG:T.white, color:confirmType===t?T.sage:T.muted, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:T.fontSans, transition:'all 0.15s' }}>
+                    {t === 'presencial' ? '📍 Presencial' : '💻 Online'}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div style={{ display:'flex', gap:10 }}>
-              <button onClick={()=>setConfirmModal(null)} style={{ flex:1, padding:13, fontSize:14, fontWeight:600, color:T.muted, background:T.off, border:`1px solid ${T.nude}`, borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans }}>Cancelar</button>
+
+            {/* Presencial: show address */}
+            {confirmType === 'presencial' && (
+              <div style={{ background:T.sageG, borderRadius:T.r12, padding:'12px 14px', marginBottom:18, border:`1px solid ${T.sageP}` }}>
+                <p style={{ fontSize:12, fontWeight:700, color:T.sage, margin:'0 0 4px' }}>📍 Local</p>
+                {profile?.clinic_name && <p style={{ fontSize:13, color:T.dark, margin:0, fontWeight:600 }}>{profile.clinic_name}</p>}
+                {profile?.clinic_address
+                  ? <p style={{ fontSize:13, color:T.dark, margin:0 }}>{profile.clinic_address}</p>
+                  : <p style={{ fontSize:12, color:T.muted, margin:0, fontStyle:'italic' }}>Endereço não cadastrado — adicione em Meu perfil → Modalidades</p>}
+              </div>
+            )}
+
+            {/* Online: meeting link */}
+            {confirmType === 'online' && (
+              <div style={{ marginBottom:18 }}>
+                <label style={{ display:'block', fontSize:13, fontWeight:700, color:T.dark, marginBottom:8 }}>Link da reunião <span style={{ fontSize:11, color:T.muted, fontWeight:400 }}>(opcional)</span></label>
+                <input
+                  value={meetingLink}
+                  onChange={e=>{setMeetingLink(e.target.value);setMlError('')}}
+                  placeholder="https://meet.google.com/abc-defg-hij"
+                  style={{ width:'100%', padding:'12px 16px', fontSize:14, color:T.dark, background:T.off, border:`2px solid ${mlError?T.red:T.nude}`, borderRadius:T.r12, outline:'none', fontFamily:T.fontSans, boxSizing:'border-box' }}
+                  onFocus={e=>e.target.style.borderColor=mlError?T.red:T.sage}
+                  onBlur={e=>e.target.style.borderColor=mlError?T.red:T.nude}
+                />
+                {mlError && <p style={{ fontSize:12, color:T.red, margin:'6px 0 0', fontWeight:500 }}>{mlError}</p>}
+              </div>
+            )}
+
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {profile?.whatsapp && (
+                <button onClick={async()=>{
+                  const id = confirmModal.id; const mLink = confirmType==='online' ? meetingLink.trim()||undefined : undefined
+                  setConfirmModal(null)
+                  await updateStatus(id, 'confirmed', mLink, confirmType==='online'?'Online':'Presencial', true)
+                }} style={{ padding:14, fontSize:14, fontWeight:700, color:T.cream, background:T.sage, border:'none', borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+                  <MessageCircle size={16}/> Confirmar e enviar WhatsApp
+                </button>
+              )}
               <button onClick={async()=>{
-                if (!meetingLink.trim()) { setMlError('Informe o link da reunião.'); return }
-                const id = confirmModal.id
+                const id = confirmModal.id; const mLink = confirmType==='online' ? meetingLink.trim()||undefined : undefined
                 setConfirmModal(null)
-                await updateStatus(id, 'confirmed', meetingLink.trim())
-              }} style={{ flex:2, padding:13, fontSize:14, fontWeight:700, color:T.cream, background:T.sage, border:'none', borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans }}>
-                ✅ Confirmar e enviar link
+                await updateStatus(id, 'confirmed', mLink, confirmType==='online'?'Online':'Presencial', false)
+              }} style={{ padding:13, fontSize:14, fontWeight:600, color:T.dark, background:T.off, border:`1.5px solid ${T.nude}`, borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans }}>
+                ✅ Confirmar sem WhatsApp
+              </button>
+              <button onClick={()=>setConfirmModal(null)} style={{ padding:11, fontSize:13, fontWeight:500, color:T.muted, background:'none', border:'none', borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Cancel modal ── */}
+      {cancelModal && (
+        <div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.55)', display:'flex', alignItems:'center', justifyContent:'center', padding:16, backdropFilter:'blur(4px)' }}>
+          <div style={{ background:T.white, borderRadius:T.r20, padding:28, width:'100%', maxWidth:420, boxShadow:T.shadowXl }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:16 }}>
+              <h2 style={{ fontFamily:T.fontSerif, fontSize:20, color:T.dark, margin:0 }}>Cancelar agendamento</h2>
+              <button onClick={()=>setCancelModal(null)} style={{ background:'none', border:'none', cursor:'pointer', color:T.muted, padding:4 }}><X size={18}/></button>
+            </div>
+            <div style={{ background:T.redL, borderRadius:T.r12, padding:'12px 14px', marginBottom:20 }}>
+              <p style={{ fontSize:13, color:T.red, margin:0, fontWeight:500 }}>
+                Cancelar a consulta de <strong>{cancelModal.client_name}</strong> em {format(new Date(cancelModal.appt_date+'T12:00'), "dd/MM/yyyy", {locale:ptBR})} às {cancelModal.appt_time.slice(0,5)}?
+              </p>
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {profile?.whatsapp && (
+                <button onClick={async()=>{
+                  const id = cancelModal.id; setCancelModal(null)
+                  await updateStatus(id, 'cancelled', undefined, undefined, true)
+                }} style={{ padding:13, fontSize:14, fontWeight:700, color:T.cream, background:T.red, border:'none', borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+                  <MessageCircle size={16}/> Cancelar e avisar no WhatsApp
+                </button>
+              )}
+              <button onClick={async()=>{
+                const id = cancelModal.id; setCancelModal(null)
+                await updateStatus(id, 'cancelled', undefined, undefined, false)
+              }} style={{ padding:12, fontSize:13, fontWeight:600, color:T.red, background:T.redL, border:`1.5px solid rgba(239,68,68,0.2)`, borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans }}>
+                Cancelar sem WhatsApp
+              </button>
+              <button onClick={()=>setCancelModal(null)} style={{ padding:10, fontSize:13, fontWeight:500, color:T.muted, background:'none', border:'none', borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans }}>
+                Não cancelar
               </button>
             </div>
           </div>
@@ -388,12 +472,11 @@ function DashboardContent() {
               <Globe size={14}/> Minha página <ExternalLink size={11}/>
             </Link>
           )}
-          {waConnected !== null && (
-            <div onClick={()=>setTab('perfil')} style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 12px', borderRadius:T.r10, fontSize:11, color:'rgba(255,255,255,0.35)', cursor:'pointer', transition:'all 0.15s', margin:'2px 0' }}
-              onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.05)';e.currentTarget.style.color=waConnected?'#86efac':'#fca5a5'}}
+          {profile?.whatsapp && (
+            <div onClick={()=>window.open(`https://wa.me/55${profile.whatsapp!.replace(/\D/g,'')}`, '_blank')} style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 12px', borderRadius:T.r10, fontSize:11, color:'rgba(255,255,255,0.35)', cursor:'pointer', transition:'all 0.15s', margin:'2px 0' }}
+              onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.05)';e.currentTarget.style.color='#86efac'}}
               onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='rgba(255,255,255,0.35)'}}>
-              <span style={{ fontSize:7 }}>{waConnected ? '🟢' : '🔴'}</span>
-              WhatsApp {waConnected ? 'Conectado' : 'Desconectado'}
+              <MessageCircle size={12}/> WhatsApp
             </div>
           )}
           <button onClick={logout} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderRadius:T.r12, fontSize:12, fontWeight:500, color:'rgba(255,255,255,0.32)', background:'none', border:'none', cursor:'pointer', textAlign:'left', width:'100%', transition:'all 0.15s' }}
@@ -518,11 +601,23 @@ function DashboardContent() {
                                     {a.status==='pending' && (
                                       <div style={{ display:'flex', gap:5, flexShrink:0 }}>
                                         <button onClick={()=>onClickConfirm(a)} style={{ background:T.sage, color:T.cream, border:'none', borderRadius:T.r8, padding:'5px 10px', cursor:'pointer', fontSize:12, fontWeight:600 }}>✓ Confirmar</button>
-                                        <button onClick={()=>updateStatus(a.id,'cancelled')} style={{ background:T.redL, color:T.red, border:'none', borderRadius:T.r8, padding:'5px 10px', cursor:'pointer', fontSize:12, fontWeight:600 }}>✗</button>
+                                        <button onClick={()=>onClickCancel(a)} style={{ background:T.redL, color:T.red, border:'none', borderRadius:T.r8, padding:'5px 10px', cursor:'pointer', fontSize:12, fontWeight:600 }}>✗</button>
                                       </div>
                                     )}
                                     {a.status==='confirmed' && (
                                       <button onClick={()=>updateStatus(a.id,'completed')} style={{ background:T.blueL, color:T.blue, border:'none', borderRadius:T.r8, padding:'5px 10px', cursor:'pointer', fontSize:11, fontWeight:600, flexShrink:0 }}>Concluir</button>
+                                    )}
+                                    {profile?.whatsapp && a.client_phone && (
+                                      <button title="WhatsApp" onClick={()=>openWa(a.client_phone, 'reminder_24h', {
+                                        client_name:a.client_name, professional_name:profile.name,
+                                        appt_date:format(new Date(a.appt_date+'T12:00'),"dd/MM/yyyy",{locale:ptBR}),
+                                        appt_time:a.appt_time.slice(0,5),
+                                        modality: a.appointment_type==='online'?'Online':a.appointment_type==='presencial'?'Presencial':undefined,
+                                        meeting_link: a.meeting_link||undefined,
+                                        address: profile.clinic_address||undefined,
+                                      })} style={{ background:T.sageG, color:T.sage, border:'none', borderRadius:T.r8, padding:'5px 8px', cursor:'pointer', fontSize:12, display:'flex', alignItems:'center', flexShrink:0 }}>
+                                        <MessageCircle size={13}/>
+                                      </button>
                                     )}
                                   </div>
                                   {a.status==='confirmed' && a.appointment_type==='online' && (
@@ -724,7 +819,7 @@ function DashboardContent() {
                     <StatusBadge status={a.status}/>
                     {a.status==='pending' && <>
                       <button onClick={()=>onClickConfirm(a)} style={{ background:T.sage, color:T.cream, border:'none', borderRadius:T.r10, padding:'6px 11px', cursor:'pointer', fontSize:12, fontWeight:600 }}>✓</button>
-                      <button onClick={()=>updateStatus(a.id,'cancelled')} style={{ background:T.redL, color:T.red, border:'none', borderRadius:T.r10, padding:'6px 11px', cursor:'pointer', fontSize:12, fontWeight:600 }}>✗</button>
+                      <button onClick={()=>onClickCancel(a)} style={{ background:T.redL, color:T.red, border:'none', borderRadius:T.r10, padding:'6px 11px', cursor:'pointer', fontSize:12, fontWeight:600 }}>✗</button>
                     </>}
                     {a.status==='confirmed' && <>
                       {a.appointment_type==='online' && (
@@ -732,6 +827,18 @@ function DashboardContent() {
                       )}
                       <button onClick={()=>updateStatus(a.id,'completed')} style={{ background:T.blueL, color:T.blue, border:'none', borderRadius:T.r10, padding:'6px 11px', cursor:'pointer', fontSize:12, fontWeight:600 }}>Concluir</button>
                     </>}
+                    {profile?.whatsapp && a.client_phone && a.status !== 'cancelled' && (
+                      <button title="Lembrete WhatsApp" onClick={()=>openWa(a.client_phone, 'reminder_24h', {
+                        client_name:a.client_name, professional_name:profile.name,
+                        appt_date:format(new Date(a.appt_date+'T12:00'),"dd/MM/yyyy",{locale:ptBR}),
+                        appt_time:a.appt_time.slice(0,5),
+                        modality: a.appointment_type==='online'?'Online':a.appointment_type==='presencial'?'Presencial':undefined,
+                        meeting_link: a.meeting_link||undefined,
+                        address: profile.clinic_address||undefined,
+                      })} style={{ background:T.sageG, color:T.sage, border:`1px solid ${T.sageP}`, borderRadius:T.r10, padding:'6px 8px', cursor:'pointer', fontSize:12, display:'flex', alignItems:'center', gap:4, fontFamily:T.fontSans, fontWeight:600 }}>
+                        <MessageCircle size={13}/> Lembrete
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -760,9 +867,17 @@ function DashboardContent() {
                       <p style={{ fontWeight:600, fontSize:14, color:T.dark, margin:0 }}>{appts[0].client_name}</p>
                       <p style={{ fontSize:12, color:T.muted, margin:0 }}>{phone}{appts[0].client_email?` · ${appts[0].client_email}`:''}</p>
                     </div>
-                    <div style={{ textAlign:'right' }}>
-                      <p style={{ fontWeight:700, fontSize:18, color:T.dark, margin:0 }}>{appts.length}</p>
-                      <p style={{ fontSize:11, color:T.muted, margin:0 }}>consulta{appts.length!==1?'s':''}</p>
+                    <div style={{ textAlign:'right', display:'flex', alignItems:'center', gap:12 }}>
+                      <div>
+                        <p style={{ fontWeight:700, fontSize:18, color:T.dark, margin:0 }}>{appts.length}</p>
+                        <p style={{ fontSize:11, color:T.muted, margin:0 }}>consulta{appts.length!==1?'s':''}</p>
+                      </div>
+                      {profile?.whatsapp && (
+                        <button onClick={()=>window.open(`https://wa.me/55${phone.replace(/\D/g,'')}`, '_blank')}
+                          style={{ background:T.sageG, color:T.sage, border:`1px solid ${T.sageP}`, borderRadius:T.r10, padding:'8px 12px', cursor:'pointer', display:'flex', alignItems:'center', gap:5, fontSize:12, fontWeight:600, fontFamily:T.fontSans }}>
+                          <MessageCircle size={14}/> WhatsApp
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))
@@ -775,7 +890,7 @@ function DashboardContent() {
         {tab==='horarios' && <AvailabilityTab profile={profile}/>}
 
         {/* ── TAB: PERFIL ── */}
-        {tab==='perfil' && <ProfileTab profile={profile} onSave={load} onWaStatusChange={setWaConnected}/>}
+        {tab==='perfil' && <ProfileTab profile={profile} onSave={load}/>}
       </main>
     </div>
   )
@@ -1004,29 +1119,20 @@ function parsePrice(s: string): number | null {
   return isNaN(n) || n <= 0 ? null : n
 }
 
-function ProfileTab({ profile, onSave, onWaStatusChange }: { profile: Profile|null, onSave:()=>void, onWaStatusChange:(v:boolean|null)=>void }) {
+function ProfileTab({ profile, onSave }: { profile: Profile|null, onSave:()=>void }) {
   const [form, setForm] = useState({ name:'', bio:'', whatsapp:'', city:'', state:'', specialties:'', crm:'', instagram:'' })
   const [saving,  setSaving]  = useState(false)
   const [saved,   setSaved]   = useState(false)
   const [savingM, setSavingM] = useState(false)
   const [savedM,  setSavedM]  = useState(false)
   const [photo,   setPhoto]   = useState('')
+  const [waAutoPrefs, setWaAutoPrefs] = useState({ confirm: true, cancel: true, reschedule: true })
   const [mod, setMod] = useState({
     online: false, in_person: false,
     online_platform: 'Google Meet',
     online_price: '', presential_price: '',
     clinic_name: '', clinic_address: '', clinic_maps_link: '',
   })
-  const [waLoading, setWaLoading] = useState(false)
-  const [waConnected, setWaConnected] = useState(false)
-  const [waStatus, setWaStatus] = useState<string|null>(null)
-  const [waPhone, setWaPhone] = useState<string|null>(null)
-  const [waVerifiedName, setWaVerifiedName] = useState<string|null>(null)
-  const [waConnectedAt, setWaConnectedAt] = useState<string|null>(null)
-  const [waUpdatedAt, setWaUpdatedAt] = useState<string|null>(null)
-  const [waActionLoading, setWaActionLoading] = useState(false)
-  const [waTestResult, setWaTestResult] = useState<{ok:boolean,error?:string}|null>(null)
-  const waListenerRef = useRef<((e: MessageEvent) => void) | null>(null)
 
   useEffect(() => {
     if (!profile) return
@@ -1044,21 +1150,17 @@ function ProfileTab({ profile, onSave, onWaStatusChange }: { profile: Profile|nu
     })
   }, [profile])
 
-  function refreshWaStatus() {
-    return fetch('/api/integrations/whatsapp').then(r => r.json()).then(d => {
-      setWaConnected(d?.connected ?? false)
-      setWaStatus(d?.status ?? null)
-      setWaPhone(d?.phone ?? null)
-      setWaVerifiedName(d?.verified_name ?? null)
-      setWaConnectedAt(d?.connected_at ?? null)
-      setWaUpdatedAt(d?.updated_at ?? null)
-    })
-  }
-
   useEffect(() => {
-    setWaLoading(true)
-    refreshWaStatus().catch(() => {}).finally(() => setWaLoading(false))
+    try {
+      const saved = localStorage.getItem('wa_auto_prefs')
+      if (saved) setWaAutoPrefs(JSON.parse(saved))
+    } catch {}
   }, [])
+
+  function saveWaPrefs(prefs: typeof waAutoPrefs) {
+    setWaAutoPrefs(prefs)
+    try { localStorage.setItem('wa_auto_prefs', JSON.stringify(prefs)) } catch {}
+  }
 
   async function uploadPhoto(file: File): Promise<string> {
     const fd = new FormData(); fd.append('file', file)
@@ -1092,93 +1194,6 @@ function ProfileTab({ profile, onSave, onWaStatusChange }: { profile: Profile|nu
       clinic_maps_link: mod.in_person && mod.clinic_maps_link ? mod.clinic_maps_link : null,
     }).eq('id', profile.id)
     setSavingM(false); setSavedM(true); onSave(); setTimeout(()=>setSavedM(false),2500)
-  }
-
-  async function waAction(action: string) {
-    setWaActionLoading(true); setWaTestResult(null)
-    const res = await fetch('/api/integrations/whatsapp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action }) })
-    const d = await res.json()
-    if (action === 'test') {
-      setWaTestResult({ ok: d.ok, error: d.error })
-    } else if (d.ok || d.connected !== undefined) {
-      const nowConnected = action !== 'disconnect'
-      setWaConnected(nowConnected)
-      onWaStatusChange(nowConnected ? true : null)
-      if (nowConnected) await refreshWaStatus().catch(() => {})
-    }
-    setWaActionLoading(false)
-  }
-
-  function startEmbeddedSignup() {
-    const FB = (window as any).FB
-    if (!FB) {
-      setWaTestResult({ ok: false, error: 'SDK do Facebook não carregado. Recarregue a página.' })
-      return
-    }
-
-    // Remove previous listener if any
-    if (waListenerRef.current) window.removeEventListener('message', waListenerRef.current)
-
-    let signupData: { phone_number_id?: string; waba_id?: string } = {}
-
-    const messageHandler = (event: MessageEvent) => {
-      if (event.origin !== 'https://www.facebook.com') return
-      try {
-        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data
-        if (data.type === 'WA_EMBEDDED_SIGNUP') {
-          if (data.event === 'FINISH') {
-            signupData = {
-              phone_number_id: data.data?.phone_number_id,
-              waba_id: data.data?.waba_id,
-            }
-          }
-        }
-      } catch {}
-    }
-    waListenerRef.current = messageHandler
-    window.addEventListener('message', messageHandler)
-
-    FB.login(
-      async (response: any) => {
-        window.removeEventListener('message', messageHandler)
-        waListenerRef.current = null
-
-        if (response.authResponse?.code && signupData.phone_number_id && signupData.waba_id) {
-          setWaActionLoading(true)
-          try {
-            const res = await fetch('/api/integrations/whatsapp/callback', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                code: response.authResponse.code,
-                phone_number_id: signupData.phone_number_id,
-                waba_id: signupData.waba_id,
-              }),
-            })
-            const d = await res.json()
-            if (d.ok) {
-              setWaConnected(true)
-              onWaStatusChange(true)
-              await refreshWaStatus().catch(() => {})
-            } else {
-              setWaTestResult({ ok: false, error: d.error ?? 'Falha ao conectar' })
-            }
-          } catch (err) {
-            setWaTestResult({ ok: false, error: String(err) })
-          } finally {
-            setWaActionLoading(false)
-          }
-        } else if (response.status === 'not_authorized' || !response.authResponse) {
-          // User cancelled or denied — silent, no error shown
-        }
-      },
-      {
-        config_id: process.env.NEXT_PUBLIC_META_CONFIG_ID,
-        response_type: 'code',
-        override_default_response_type: true,
-        extras: { setup: {}, featureName: 'whatsapp_embedded_signup', sessionInfoVersion: 2 },
-      }
-    )
   }
 
   function upd(k:string,v:string) { setForm(f=>({...f,[k]:v})) }
@@ -1323,122 +1338,48 @@ function ProfileTab({ profile, onSave, onWaStatusChange }: { profile: Profile|nu
         </button>
       </form>
 
-      {/* ── INTEGRAÇÕES ── */}
+      {/* ── WHATSAPP ── */}
       <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:24, marginBottom:20 }}>
-        <h2 style={{ fontFamily:T.fontSerif, fontSize:19, color:T.dark, margin:'0 0 4px' }}>Integrações</h2>
-        <p style={{ fontSize:13, color:T.muted, margin:'0 0 20px' }}>Conecte ferramentas para automatizar a comunicação com seus pacientes.</p>
-
-        {/* WhatsApp Business card */}
-        <div style={{ border:`2px solid ${waConnected ? T.sageP : waStatus === 'error' ? 'rgba(239,68,68,0.35)' : T.nude}`, borderRadius:T.r16, padding:20, transition:'border-color 0.2s' }}>
-          {waLoading ? (
-            <p style={{ fontSize:13, color:T.muted, margin:0 }}>Carregando...</p>
-          ) : (profile?.plan !== 'premium' || !profile?.plan_active) ? (
-            /* Plan gate */
-            <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:16, flexWrap:'wrap' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-                <span style={{ fontSize:28 }}>💬</span>
-                <div>
-                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:3 }}>
-                    <span style={{ fontSize:15, fontWeight:700, color:T.dark }}>WhatsApp Business</span>
-                    <span style={{ fontSize:10, fontWeight:800, padding:'2px 8px', borderRadius:T.r100, background:T.amberL, color:T.amber, letterSpacing:'0.04em' }}>PRO</span>
-                  </div>
-                  <p style={{ fontSize:13, color:T.muted, margin:0 }}>Disponível apenas no Plano Pro. Envie confirmações e lembretes automáticos.</p>
-                </div>
-              </div>
-              <Link href="/planos" style={{ flexShrink:0, display:'inline-flex', alignItems:'center', gap:6, padding:'10px 18px', borderRadius:T.r12, background:T.amber, color:'#fff', fontSize:13, fontWeight:700, textDecoration:'none' }}>
-                Fazer upgrade <ChevronRight size={14}/>
-              </Link>
-            </div>
-          ) : waConnected ? (
-            /* Connected state */
-            <div>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                  <span style={{ fontSize:24 }}>💬</span>
-                  <span style={{ fontSize:15, fontWeight:700, color:T.dark }}>WhatsApp Business</span>
-                </div>
-                <span style={{ fontSize:11, fontWeight:700, padding:'4px 12px', borderRadius:T.r100, background:T.sageG, color:T.sage }}>🟢 Conectado</span>
-              </div>
-              <div style={{ background:T.off, borderRadius:T.r12, padding:'14px 16px', marginBottom:16, display:'flex', flexDirection:'column', gap:8 }}>
-                {(waVerifiedName || waPhone) && (
-                  <div style={{ display:'flex', gap:8 }}>
-                    <span style={{ fontSize:13, color:T.muted, minWidth:160 }}>Conta conectada</span>
-                    <span style={{ fontSize:13, fontWeight:600, color:T.dark }}>{waVerifiedName ?? waPhone}</span>
-                  </div>
-                )}
-                {waPhone && waVerifiedName && (
-                  <div style={{ display:'flex', gap:8 }}>
-                    <span style={{ fontSize:13, color:T.muted, minWidth:160 }}>Número</span>
-                    <span style={{ fontSize:13, color:T.dark }}>{waPhone}</span>
-                  </div>
-                )}
-                {waConnectedAt && (
-                  <div style={{ display:'flex', gap:8 }}>
-                    <span style={{ fontSize:13, color:T.muted, minWidth:160 }}>Conectado em</span>
-                    <span style={{ fontSize:13, color:T.dark }}>{format(new Date(waConnectedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
-                  </div>
-                )}
-              </div>
-              {waTestResult && (
-                <div style={{ marginBottom:14, padding:'10px 14px', borderRadius:T.r10, background:waTestResult.ok?T.sageG:T.redL, border:`1px solid ${waTestResult.ok?T.sageP:'rgba(239,68,68,0.2)'}` }}>
-                  <p style={{ fontSize:13, fontWeight:600, color:waTestResult.ok?T.sage:T.red, margin:0 }}>
-                    {waTestResult.ok ? '✅ Mensagem de teste enviada! Verifique seu WhatsApp.' : `❌ Falha: ${waTestResult.error || 'Erro desconhecido'}`}
-                  </p>
-                </div>
-              )}
-              <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
-                <button onClick={()=>waAction('test')} disabled={waActionLoading}
-                  style={{ padding:'10px 16px', fontSize:13, fontWeight:600, color:T.blue, background:T.blueL, border:`1.5px solid rgba(59,130,246,0.15)`, borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans }}>
-                  {waActionLoading ? '...' : '📤 Enviar teste'}
-                </button>
-                <button onClick={startEmbeddedSignup} disabled={waActionLoading}
-                  style={{ padding:'10px 16px', fontSize:13, fontWeight:600, color:T.muted, background:T.off, border:`1.5px solid ${T.nude}`, borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans }}>
-                  Reconectar
-                </button>
-                <button onClick={()=>waAction('disconnect')} disabled={waActionLoading}
-                  style={{ padding:'10px 16px', fontSize:13, fontWeight:600, color:T.red, background:T.redL, border:`1.5px solid rgba(239,68,68,0.15)`, borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans }}>
-                  Desconectar
-                </button>
-              </div>
-            </div>
-          ) : waStatus === 'error' ? (
-            /* Token expired / error state */
-            <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:16, flexWrap:'wrap' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-                <span style={{ fontSize:28 }}>💬</span>
-                <div>
-                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-                    <span style={{ fontSize:15, fontWeight:700, color:T.dark }}>WhatsApp Business</span>
-                    <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:T.r100, background:T.redL, color:T.red }}>⚠️ Token expirado</span>
-                  </div>
-                  <p style={{ fontSize:13, color:T.muted, margin:0 }}>Sua autorização expirou. Reconecte para retomar os envios automáticos.</p>
-                </div>
-              </div>
-              <button onClick={startEmbeddedSignup} disabled={waActionLoading}
-                style={{ flexShrink:0, padding:'11px 22px', fontSize:14, fontWeight:700, color:T.cream, background:T.amber, border:'none', borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans, whiteSpace:'nowrap' }}>
-                {waActionLoading ? 'Aguarde...' : 'Reconectar'}
-              </button>
-            </div>
-          ) : (
-            /* Disconnected state */
-            <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:16, flexWrap:'wrap' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-                <span style={{ fontSize:28 }}>💬</span>
-                <div>
-                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-                    <span style={{ fontSize:15, fontWeight:700, color:T.dark }}>WhatsApp Business</span>
-                    <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:T.r100, background:T.redL, color:T.red }}>🔴 Não conectado</span>
-                  </div>
-                  <p style={{ fontSize:13, color:T.muted, margin:0 }}>Conecte seu WhatsApp Business para enviar confirmações e lembretes automáticos.</p>
-                </div>
-              </div>
-              <button onClick={startEmbeddedSignup} disabled={waActionLoading}
-                style={{ flexShrink:0, padding:'11px 22px', fontSize:14, fontWeight:700, color:T.cream, background:T.sage, border:'none', borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans, whiteSpace:'nowrap' }}>
-                {waActionLoading ? 'Aguarde...' : 'Conectar WhatsApp'}
-              </button>
-            </div>
-          )}
+        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:4 }}>
+          <span style={{ fontSize:20 }}>💬</span>
+          <h2 style={{ fontFamily:T.fontSerif, fontSize:19, color:T.dark, margin:0 }}>WhatsApp</h2>
         </div>
+        <p style={{ fontSize:13, color:T.muted, margin:'0 0 20px' }}>
+          O número de WhatsApp cadastrado no seu perfil é usado para abrir conversas com seus pacientes. Nenhuma configuração adicional é necessária.
+        </p>
+
+        {profile?.whatsapp ? (
+          <div style={{ background:T.sageG, border:`1px solid ${T.sageP}`, borderRadius:T.r12, padding:'12px 16px', marginBottom:20, display:'flex', alignItems:'center', gap:10 }}>
+            <span style={{ fontSize:16 }}>✅</span>
+            <div>
+              <p style={{ fontSize:13, fontWeight:600, color:T.sage, margin:0 }}>Número cadastrado</p>
+              <p style={{ fontSize:13, color:T.mid, margin:0 }}>{profile.whatsapp}</p>
+            </div>
+          </div>
+        ) : (
+          <div style={{ background:T.amberL, border:`1px solid rgba(217,119,6,0.2)`, borderRadius:T.r12, padding:'12px 16px', marginBottom:20 }}>
+            <p style={{ fontSize:13, color:T.amber, margin:0 }}>⚠️ Cadastre seu número de WhatsApp no formulário acima para habilitar os botões de WhatsApp.</p>
+          </div>
+        )}
+
+        <p style={{ fontSize:13, fontWeight:600, color:T.dark, margin:'0 0 12px' }}>Envio de WhatsApp</p>
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          {([
+            { key:'confirm',    label:'Abrir automaticamente o WhatsApp ao confirmar um agendamento' },
+            { key:'cancel',     label:'Abrir automaticamente o WhatsApp ao cancelar um agendamento' },
+            { key:'reschedule', label:'Abrir automaticamente o WhatsApp ao reagendar um agendamento' },
+          ] as { key: keyof typeof waAutoPrefs, label: string }[]).map(({ key, label }) => (
+            <label key={key} style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer' }}>
+              <input type="checkbox" checked={waAutoPrefs[key]}
+                onChange={e => saveWaPrefs({ ...waAutoPrefs, [key]: e.target.checked })}
+                style={{ width:16, height:16, accentColor:T.sage, cursor:'pointer' }}/>
+              <span style={{ fontSize:13, color:T.dark }}>{label}</span>
+            </label>
+          ))}
+        </div>
+        <p style={{ fontSize:12, color:T.muted, margin:'14px 0 0' }}>
+          Quando marcado, ao realizar a ação o WhatsApp abre com a mensagem já preenchida para envio manual.
+        </p>
       </div>
 
       {profile && (
