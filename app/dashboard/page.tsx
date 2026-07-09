@@ -76,8 +76,8 @@ function DashboardContent() {
       setAppointments(a || [])
       setHasSchedule((schedCount || 0) > 0)
       setLoading(false)
-      fetch('/api/whatsapp/settings').then(r=>r.json()).then(d => {
-        if (d?.settings != null) setWaConnected(d.settings.is_connected ?? false)
+      fetch('/api/integrations/whatsapp').then(r=>r.json()).then(d => {
+        if (d?.connected !== undefined) setWaConnected(d.connected)
       }).catch(()=>{})
       if (params.get('payment') === 'success') setToast('🎉 Pagamento confirmado! Plano ativado.')
     } catch {
@@ -1007,15 +1007,11 @@ function ProfileTab({ profile, onSave, onWaStatusChange }: { profile: Profile|nu
     clinic_name: '', clinic_address: '', clinic_maps_link: '',
   })
   const [waLoading, setWaLoading] = useState(false)
-  const [waSettings, setWaSettings] = useState<{ phone_number_id:string; business_account_id:string; verify_token:string|null; is_connected:boolean; has_token:boolean; updated_at:string }|null>(null)
-  const [waForm, setWaForm] = useState({ phone_number_id:'', business_account_id:'', access_token:'', verify_token:'' })
-  const [waSaving, setWaSaving] = useState(false)
-  const [waSaved, setWaSaved] = useState(false)
-  const [waError, setWaError] = useState('')
-  const [waTestPhone, setWaTestPhone] = useState('')
+  const [waConnected, setWaConnected] = useState(false)
+  const [waPhone, setWaPhone] = useState<string|null>(null)
+  const [waUpdatedAt, setWaUpdatedAt] = useState<string|null>(null)
+  const [waActionLoading, setWaActionLoading] = useState(false)
   const [waTestResult, setWaTestResult] = useState<{ok:boolean,error?:string}|null>(null)
-  const [waTestLoading, setWaTestLoading] = useState(false)
-  const [waTestOpen, setWaTestOpen] = useState(false)
 
   useEffect(() => {
     if (!profile) return
@@ -1035,11 +1031,10 @@ function ProfileTab({ profile, onSave, onWaStatusChange }: { profile: Profile|nu
 
   useEffect(() => {
     setWaLoading(true)
-    fetch('/api/whatsapp/settings').then(r=>r.json()).then(d => {
-      if (d?.settings) {
-        setWaSettings(d.settings)
-        setWaForm(f=>({ ...f, phone_number_id: d.settings.phone_number_id||'', business_account_id: d.settings.business_account_id||'', verify_token: d.settings.verify_token||'' }))
-      }
+    fetch('/api/integrations/whatsapp').then(r=>r.json()).then(d => {
+      setWaConnected(d?.connected ?? false)
+      setWaPhone(d?.phone ?? null)
+      setWaUpdatedAt(d?.updated_at ?? null)
       setWaLoading(false)
     }).catch(()=>setWaLoading(false))
   }, [])
@@ -1078,42 +1073,25 @@ function ProfileTab({ profile, onSave, onWaStatusChange }: { profile: Profile|nu
     setSavingM(false); setSavedM(true); onSave(); setTimeout(()=>setSavedM(false),2500)
   }
 
-  async function saveWa(e: React.FormEvent) {
-    e.preventDefault()
-    if (!waForm.phone_number_id || !waForm.business_account_id || !waForm.access_token) {
-      setWaError('Phone Number ID, Business Account ID e Access Token são obrigatórios.')
-      return
+  async function waAction(action: string) {
+    setWaActionLoading(true); setWaTestResult(null)
+    const res = await fetch('/api/integrations/whatsapp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action }) })
+    const d = await res.json()
+    if (action === 'test') {
+      setWaTestResult({ ok: d.ok, error: d.error })
+    } else {
+      if (d.ok || d.connected !== undefined) {
+        const newConnected = action === 'disconnect' ? false : true
+        setWaConnected(newConnected)
+        onWaStatusChange(newConnected ? true : null)
+        if (newConnected) {
+          const status = await fetch('/api/integrations/whatsapp').then(r=>r.json())
+          setWaPhone(status?.phone ?? null)
+          setWaUpdatedAt(status?.updated_at ?? null)
+        }
+      }
     }
-    setWaSaving(true); setWaError('')
-    const res = await fetch('/api/whatsapp/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(waForm) })
-    const data = await res.json()
-    if (!data.ok) { setWaError(data.error || 'Erro ao salvar.'); setWaSaving(false); return }
-    setWaSaved(true); setWaSaving(false)
-    const r2 = await fetch('/api/whatsapp/settings')
-    const d2 = await r2.json()
-    if (d2?.settings) { setWaSettings(d2.settings); onWaStatusChange(d2.settings.is_connected) }
-    setTimeout(()=>setWaSaved(false),2500)
-  }
-
-  async function disconnectWa() {
-    await fetch('/api/whatsapp/settings', { method:'DELETE' })
-    setWaSettings(null)
-    setWaForm({ phone_number_id:'', business_account_id:'', access_token:'', verify_token:'' })
-    setWaTestResult(null); setWaTestOpen(false)
-    onWaStatusChange(null)
-  }
-
-  async function testWa() {
-    if (!waTestPhone.trim()) return
-    setWaTestLoading(true); setWaTestResult(null)
-    const res = await fetch('/api/whatsapp/test', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ phone: waTestPhone.trim() }) })
-    const data = await res.json()
-    setWaTestResult({ ok: data.ok, error: data.error })
-    setWaTestLoading(false)
-    if (data.ok !== waSettings?.is_connected) {
-      setWaSettings(s => s ? { ...s, is_connected: !!data.ok } : s)
-      onWaStatusChange(!!data.ok)
-    }
+    setWaActionLoading(false)
   }
 
   function upd(k:string,v:string) { setForm(f=>({...f,[k]:v})) }
@@ -1258,96 +1236,98 @@ function ProfileTab({ profile, onSave, onWaStatusChange }: { profile: Profile|nu
         </button>
       </form>
 
-      {/* ── WHATSAPP BUSINESS ── */}
+      {/* ── INTEGRAÇÕES ── */}
       <div style={{ background:T.white, borderRadius:T.r20, boxShadow:T.shadowCard, padding:24, marginBottom:20 }}>
-        <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:16 }}>
-          <div>
-            <h2 style={{ fontFamily:T.fontSerif, fontSize:19, color:T.dark, margin:'0 0 4px' }}>WhatsApp Business</h2>
-            <p style={{ fontSize:13, color:T.muted, margin:0 }}>Conecte sua conta Meta para enviar notificações automáticas aos pacientes.</p>
-          </div>
-          {waSettings && (
-            <span style={{ flexShrink:0, marginLeft:12, fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:T.r100, background:waSettings.is_connected?T.sageG:T.redL, color:waSettings.is_connected?T.sage:T.red }}>
-              {waSettings.is_connected ? '🟢 Conectado' : '🔴 Desconectado'}
-            </span>
-          )}
-        </div>
+        <h2 style={{ fontFamily:T.fontSerif, fontSize:19, color:T.dark, margin:'0 0 4px' }}>Integrações</h2>
+        <p style={{ fontSize:13, color:T.muted, margin:'0 0 20px' }}>Conecte ferramentas para automatizar a comunicação com seus pacientes.</p>
 
-        {waLoading ? (
-          <p style={{ fontSize:13, color:T.muted }}>Carregando...</p>
-        ) : (
-          <form onSubmit={saveWa} style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            <div>
-              <label style={{ display:'block', fontSize:13, fontWeight:600, color:T.dark, marginBottom:6 }}>Phone Number ID <span style={{ color:T.red }}>*</span></label>
-              <input value={waForm.phone_number_id} onChange={e=>setWaForm(f=>({...f,phone_number_id:e.target.value}))} placeholder="123456789012345"
-                style={inputStyle} onFocus={e=>e.currentTarget.style.borderColor=T.sage} onBlur={e=>e.currentTarget.style.borderColor=T.nude}/>
-              <p style={{ fontSize:11, color:T.muted, margin:'4px 0 0' }}>Meta Business Suite → WhatsApp → Configuração da API</p>
-            </div>
-            <div>
-              <label style={{ display:'block', fontSize:13, fontWeight:600, color:T.dark, marginBottom:6 }}>Business Account ID <span style={{ color:T.red }}>*</span></label>
-              <input value={waForm.business_account_id} onChange={e=>setWaForm(f=>({...f,business_account_id:e.target.value}))} placeholder="987654321098765"
-                style={inputStyle} onFocus={e=>e.currentTarget.style.borderColor=T.sage} onBlur={e=>e.currentTarget.style.borderColor=T.nude}/>
-            </div>
-            <div>
-              <label style={{ display:'block', fontSize:13, fontWeight:600, color:T.dark, marginBottom:6 }}>
-                Access Token (Permanente) <span style={{ color:T.red }}>*</span>
-                {waSettings?.has_token && <span style={{ fontSize:11, fontWeight:500, color:T.sage, marginLeft:8 }}>✓ Salvo</span>}
-              </label>
-              <input type="password" value={waForm.access_token} onChange={e=>setWaForm(f=>({...f,access_token:e.target.value}))}
-                placeholder={waSettings?.has_token ? '••••••••••••••••' : 'EAAxxxxxx...'}
-                style={inputStyle} onFocus={e=>e.currentTarget.style.borderColor=T.sage} onBlur={e=>e.currentTarget.style.borderColor=T.nude}/>
-              <p style={{ fontSize:11, color:T.muted, margin:'4px 0 0' }}>Use um token permanente. Nunca é exibido após salvar.</p>
-            </div>
-            <div>
-              <label style={{ display:'block', fontSize:13, fontWeight:600, color:T.dark, marginBottom:6 }}>Verify Token <span style={{ fontSize:12, fontWeight:400, color:T.muted }}>— opcional (Webhook)</span></label>
-              <input value={waForm.verify_token} onChange={e=>setWaForm(f=>({...f,verify_token:e.target.value}))} placeholder="meu-token-secreto"
-                style={inputStyle} onFocus={e=>e.currentTarget.style.borderColor=T.sage} onBlur={e=>e.currentTarget.style.borderColor=T.nude}/>
-            </div>
-
-            {waError && <p style={{ fontSize:13, color:T.red, fontWeight:500, margin:0 }}>⚠ {waError}</p>}
-
-            <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
-              <button type="submit" disabled={waSaving} style={{ flex:'1 1 140px', padding:'12px 16px', fontSize:14, fontWeight:700, color:T.cream, background:waSaved?T.sage:T.dark, border:'none', borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans, transition:'background 0.2s' }}>
-                {waSaved ? '✓ Credenciais salvas!' : waSaving ? 'Salvando...' : 'Salvar credenciais'}
-              </button>
-              {waSettings && (
-                <button type="button" onClick={()=>setWaTestOpen(o=>!o)}
-                  style={{ padding:'12px 16px', fontSize:14, fontWeight:600, color:T.blue, background:T.blueL, border:`1.5px solid rgba(59,130,246,0.15)`, borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans }}>
-                  🔍 Testar conexão
-                </button>
-              )}
-              {waSettings && (
-                <button type="button" onClick={disconnectWa}
-                  style={{ padding:'12px 16px', fontSize:14, fontWeight:600, color:T.red, background:T.redL, border:`1.5px solid rgba(239,68,68,0.15)`, borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans }}>
-                  Desconectar
-                </button>
-              )}
-            </div>
-
-            {waTestOpen && waSettings && (
-              <div style={{ background:T.off, border:`1.5px solid ${T.nude}`, borderRadius:T.r14, padding:'16px 18px' }}>
-                <p style={{ fontSize:13, fontWeight:700, color:T.dark, margin:'0 0 12px' }}>Enviar mensagem de teste</p>
-                <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'flex-end' }}>
-                  <div style={{ flex:'1 1 160px' }}>
-                    <label style={{ display:'block', fontSize:12, fontWeight:600, color:T.muted, marginBottom:6 }}>Número de destino</label>
-                    <input value={waTestPhone} onChange={e=>setWaTestPhone(e.target.value)} placeholder="(11) 99999-9999"
-                      style={inputStyle} onFocus={e=>e.currentTarget.style.borderColor=T.sage} onBlur={e=>e.currentTarget.style.borderColor=T.nude}/>
+        {/* WhatsApp Business card */}
+        <div style={{ border:`2px solid ${waConnected ? T.sageP : T.nude}`, borderRadius:T.r16, padding:20, transition:'border-color 0.2s' }}>
+          {waLoading ? (
+            <p style={{ fontSize:13, color:T.muted, margin:0 }}>Carregando...</p>
+          ) : (profile?.plan !== 'premium' || !profile?.plan_active) ? (
+            /* Plan gate */
+            <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:16, flexWrap:'wrap' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                <span style={{ fontSize:28 }}>💬</span>
+                <div>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:3 }}>
+                    <span style={{ fontSize:15, fontWeight:700, color:T.dark }}>WhatsApp Business</span>
+                    <span style={{ fontSize:10, fontWeight:800, padding:'2px 8px', borderRadius:T.r100, background:T.amberL, color:T.amber, letterSpacing:'0.04em' }}>PRO</span>
                   </div>
-                  <button type="button" onClick={testWa} disabled={waTestLoading || !waTestPhone.trim()}
-                    style={{ padding:'12px 20px', fontSize:14, fontWeight:700, color:T.cream, background:T.sage, border:'none', borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans, whiteSpace:'nowrap' }}>
-                    {waTestLoading ? 'Enviando...' : '📤 Enviar teste'}
-                  </button>
+                  <p style={{ fontSize:13, color:T.muted, margin:0 }}>Disponível apenas no Plano Pro. Envie confirmações e lembretes automáticos.</p>
                 </div>
-                {waTestResult && (
-                  <div style={{ marginTop:12, padding:'10px 14px', borderRadius:T.r10, background:waTestResult.ok?T.sageG:T.redL, border:`1px solid ${waTestResult.ok?T.sageP:'rgba(239,68,68,0.2)'}` }}>
-                    <p style={{ fontSize:13, fontWeight:600, color:waTestResult.ok?T.sage:T.red, margin:0 }}>
-                      {waTestResult.ok ? '✅ Mensagem enviada! Verifique o WhatsApp.' : `❌ Falha: ${waTestResult.error || 'Erro desconhecido'}`}
-                    </p>
+              </div>
+              <Link href="/planos" style={{ flexShrink:0, display:'inline-flex', alignItems:'center', gap:6, padding:'10px 18px', borderRadius:T.r12, background:T.amber, color:'#fff', fontSize:13, fontWeight:700, textDecoration:'none' }}>
+                Fazer upgrade <ChevronRight size={14}/>
+              </Link>
+            </div>
+          ) : waConnected ? (
+            /* Connected state */
+            <div>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                  <span style={{ fontSize:24 }}>💬</span>
+                  <span style={{ fontSize:15, fontWeight:700, color:T.dark }}>WhatsApp Business</span>
+                </div>
+                <span style={{ fontSize:11, fontWeight:700, padding:'4px 12px', borderRadius:T.r100, background:T.sageG, color:T.sage }}>🟢 Conectado</span>
+              </div>
+              <div style={{ background:T.off, borderRadius:T.r12, padding:'14px 16px', marginBottom:16, display:'flex', flexDirection:'column', gap:8 }}>
+                {waPhone && (
+                  <div style={{ display:'flex', gap:8 }}>
+                    <span style={{ fontSize:13, color:T.muted, minWidth:160 }}>Número conectado</span>
+                    <span style={{ fontSize:13, fontWeight:600, color:T.dark }}>{waPhone}</span>
+                  </div>
+                )}
+                {waUpdatedAt && (
+                  <div style={{ display:'flex', gap:8 }}>
+                    <span style={{ fontSize:13, color:T.muted, minWidth:160 }}>Última sincronização</span>
+                    <span style={{ fontSize:13, color:T.dark }}>{format(new Date(waUpdatedAt), "dd/MM 'às' HH:mm", { locale: ptBR })}</span>
                   </div>
                 )}
               </div>
-            )}
-          </form>
-        )}
+              {waTestResult && (
+                <div style={{ marginBottom:14, padding:'10px 14px', borderRadius:T.r10, background:waTestResult.ok?T.sageG:T.redL, border:`1px solid ${waTestResult.ok?T.sageP:'rgba(239,68,68,0.2)'}` }}>
+                  <p style={{ fontSize:13, fontWeight:600, color:waTestResult.ok?T.sage:T.red, margin:0 }}>
+                    {waTestResult.ok ? '✅ Mensagem de teste enviada! Verifique seu WhatsApp.' : `❌ Falha: ${waTestResult.error || 'Erro desconhecido'}`}
+                  </p>
+                </div>
+              )}
+              <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+                <button onClick={()=>waAction('test')} disabled={waActionLoading}
+                  style={{ padding:'10px 16px', fontSize:13, fontWeight:600, color:T.blue, background:T.blueL, border:`1.5px solid rgba(59,130,246,0.15)`, borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans }}>
+                  {waActionLoading ? '...' : '📤 Enviar teste'}
+                </button>
+                <button onClick={()=>waAction('reconnect')} disabled={waActionLoading}
+                  style={{ padding:'10px 16px', fontSize:13, fontWeight:600, color:T.muted, background:T.off, border:`1.5px solid ${T.nude}`, borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans }}>
+                  Reconectar
+                </button>
+                <button onClick={()=>waAction('disconnect')} disabled={waActionLoading}
+                  style={{ padding:'10px 16px', fontSize:13, fontWeight:600, color:T.red, background:T.redL, border:`1.5px solid rgba(239,68,68,0.15)`, borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans }}>
+                  Desconectar
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Disconnected state */
+            <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:16, flexWrap:'wrap' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                <span style={{ fontSize:28 }}>💬</span>
+                <div>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                    <span style={{ fontSize:15, fontWeight:700, color:T.dark }}>WhatsApp Business</span>
+                    <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:T.r100, background:T.redL, color:T.red }}>🔴 Não conectado</span>
+                  </div>
+                  <p style={{ fontSize:13, color:T.muted, margin:0 }}>Conecte para enviar confirmações e lembretes automáticos aos seus pacientes.</p>
+                </div>
+              </div>
+              <button onClick={()=>waAction('connect')} disabled={waActionLoading}
+                style={{ flexShrink:0, padding:'11px 22px', fontSize:14, fontWeight:700, color:T.cream, background:T.sage, border:'none', borderRadius:T.r12, cursor:'pointer', fontFamily:T.fontSans, whiteSpace:'nowrap' }}>
+                {waActionLoading ? 'Conectando...' : '✓ Conectar WhatsApp'}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {profile && (

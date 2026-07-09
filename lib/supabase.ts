@@ -90,11 +90,14 @@ export type ScheduleBreak = {
   created_at: string
 }
 
-export type WhatsAppSettings = {
-  phone_number_id: string
-  business_account_id: string
-  verify_token: string | null
-  is_connected: boolean
-  has_token: boolean
+export type Integration = {
+  id: string
+  user_id: string
+  provider: 'whatsapp' | 'email' | 'sms' | 'telegram'
+  provider_type: string | null
+  status: 'active' | 'inactive' | 'error'
+  config_json: Record<string, unknown>
+  last_used_at: string | null
+  created_at: string
   updated_at: string
 }
