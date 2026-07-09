@@ -211,10 +211,6 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
     if (!error) {
       track(profile.id, 'booking_completed')
 
-      // Notify professional via WhatsApp about new booking
-      fetch('/api/whatsapp', { method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({ type:'new_booking', professional_id:profile.id, professional_phone:profile.whatsapp, professional_name:profile.name, client_name:clientName, client_phone:clientPhone, appt_date:selDate, appt_time:selTime, modality:modalityLabel, price:fmtPrice }) })
-
       // Notify professional via email about new booking
       if ((profile as any).email) {
         fetch('/api/email', { method:'POST', headers:{'Content-Type':'application/json'},

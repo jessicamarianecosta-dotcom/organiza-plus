@@ -1,6 +1,3 @@
-const META_VERSION = 'v19.0'
-const META_BASE = 'https://graph.facebook.com'
-
 export type WaMessageType =
   | 'booking_received'  // client receives after booking (pending)
   | 'new_booking'       // professional receives when client books
@@ -26,18 +23,6 @@ export interface WaData {
   maps_link?: string
   new_date?: string
   new_time?: string
-}
-
-export interface WaSettings {
-  phone_number_id: string
-  access_token: string
-}
-
-export interface WaSendResult {
-  sent: boolean
-  wa_message_id?: string
-  wa_link: string
-  error?: string
 }
 
 function lines(...parts: (string | null | undefined)[]): string {
@@ -177,48 +162,9 @@ export function buildWaMessage(type: WaMessageType, d: WaData): string {
   }
 }
 
-export async function sendWhatsApp(
-  settings: WaSettings,
-  phone: string,
-  type: WaMessageType,
-  data: WaData
-): Promise<WaSendResult> {
+export function buildWaLink(phone: string, type: WaMessageType, data: WaData): string {
   const digits = phone.replace(/\D/g, '')
   const to = digits.startsWith('55') ? digits : `55${digits}`
   const message = buildWaMessage(type, data)
-  const wa_link = `https://wa.me/${to}?text=${encodeURIComponent(message)}`
-
-  if (!settings.phone_number_id || !settings.access_token) {
-    return { sent: false, wa_link, error: 'WhatsApp Business não configurado' }
-  }
-  if (!message) {
-    return { sent: false, wa_link, error: 'Tipo de mensagem desconhecido' }
-  }
-
-  try {
-    const res = await fetch(
-      `${META_BASE}/${META_VERSION}/${settings.phone_number_id}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${settings.access_token}`,
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to,
-          type: 'text',
-          text: { body: message, preview_url: false },
-        }),
-      }
-    )
-    const json = await res.json()
-    if (!res.ok) {
-      const error = json?.error?.message || `HTTP ${res.status}: ${JSON.stringify(json)}`
-      return { sent: false, wa_link, error }
-    }
-    return { sent: true, wa_link, wa_message_id: json?.messages?.[0]?.id }
-  } catch (e: any) {
-    return { sent: false, wa_link, error: String(e) }
-  }
+  return `https://wa.me/${to}?text=${encodeURIComponent(message)}`
 }
