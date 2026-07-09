@@ -45,33 +45,33 @@ export function buildWaMessage(type: WaMessageType, d: WaData): string {
   switch (type) {
     case 'booking_received':
       return L(
-        `\u{1F44B} Olá, *${d.client_name}*!`,
+        `👋 Olá, *${d.client_name}*!`,
         '',
-        `Recebemos sua solicitação de ${lbl}. \u{1F4CB}`,
+        `Recebemos sua solicitação de ${lbl}. 📋`,
         '',
         SEP,
-        `\u{1F4C5} *Data:* ${d.appt_date}`,
-        `\u{1F552} *Horário:* ${d.appt_time}`,
-        d.modality ? `\u{1F4CD} *Modalidade:* ${d.modality}` : null,
-        d.price    ? `\u{1F4B0} *Valor:* ${d.price}` : null,
+        `📅 *Data:* ${d.appt_date}`,
+        `🕒 *Horário:* ${d.appt_time}`,
+        d.modality ? `📍 *Modalidade:* ${d.modality}` : null,
+        d.price    ? `💰 *Valor:* ${d.price}` : null,
         SEP,
         '',
         'Sua solicitação será analisada e em breve você receberá a confirmação.',
         '',
-        'Obrigado! \u{1F49A}'
+        'Obrigado! 💚'
       )
 
     case 'new_booking':
       return L(
-        `\u{1F4CB} *Novo ${lbl} — Organiza+*`,
+        `📋 *Novo ${lbl} — Organiza+*`,
         '',
         SEP,
-        `\u{1F464} *Paciente:* ${d.client_name}`,
-        d.client_phone ? `\u{1F4F1} *Telefone:* ${d.client_phone}` : null,
-        `\u{1F4C5} *Data:* ${d.appt_date}`,
-        `\u{1F552} *Horário:* ${d.appt_time}`,
-        d.modality ? `\u{1F4CD} *Modalidade:* ${d.modality}` : null,
-        d.price    ? `\u{1F4B0} *Valor:* ${d.price}` : null,
+        `👤 *Paciente:* ${d.client_name}`,
+        d.client_phone ? `📱 *Telefone:* ${d.client_phone}` : null,
+        `📅 *Data:* ${d.appt_date}`,
+        `🕒 *Horário:* ${d.appt_time}`,
+        d.modality ? `📍 *Modalidade:* ${d.modality}` : null,
+        d.price    ? `💰 *Valor:* ${d.price}` : null,
         SEP,
         '',
         '_Acesse seu painel para confirmar._'
@@ -80,29 +80,29 @@ export function buildWaMessage(type: WaMessageType, d: WaData): string {
     case 'confirmed': {
       const loc: string[] = []
       if (d.modality === 'Online' && d.meeting_link) {
-        loc.push('', '\u{1F4BB} *Link do atendimento:*', d.meeting_link)
+        loc.push('', '💻 *Link do atendimento:*', d.meeting_link)
       } else if (d.modality === 'Presencial' && (d.clinic_name || d.address)) {
         loc.push('')
-        if (d.clinic_name) loc.push(`\u{1F3E5} *Local:* ${d.clinic_name}`)
-        if (d.address)     loc.push(`\u{1F4CD} *Endereço:* ${d.address}`)
-        if (d.maps_link)   loc.push(`\u{1F5FA} *Google Maps:* ${d.maps_link}`)
+        if (d.clinic_name) loc.push(`🏥 *Local:* ${d.clinic_name}`)
+        if (d.address)     loc.push(`📍 *Endereço:* ${d.address}`)
+        if (d.maps_link)   loc.push(`🗺 *Google Maps:* ${d.maps_link}`)
       }
       return L(
-        `\u{1F44B} Olá, *${d.client_name}*!`,
+        `👋 Olá, *${d.client_name}*!`,
         '',
         `Seu ${lbl} com *${d.professional_name}* foi confirmado. ✅`,
         '',
         SEP,
-        `\u{1F4C5} *Data:* ${d.appt_date}`,
-        `\u{1F552} *Horário:* ${d.appt_time}`,
-        d.professional_specialty ? `\u{1FA7A} *Especialidade:* ${d.professional_specialty}` : null,
-        d.modality ? `\u{1F4CD} *Modalidade:* ${d.modality}` : null,
-        d.price    ? `\u{1F4B0} *Valor:* ${d.price}` : null,
+        `📅 *Data:* ${d.appt_date}`,
+        `🕒 *Horário:* ${d.appt_time}`,
+        d.professional_specialty ? `🩺 *Especialidade:* ${d.professional_specialty}` : null,
+        d.modality ? `📍 *Modalidade:* ${d.modality}` : null,
+        d.price    ? `💰 *Valor:* ${d.price}` : null,
         SEP,
         ...loc,
         '',
         '⚠ Em caso de imprevisto, avise com antecedência.',
-        'Aguardamos você! \u{1F49A}'
+        'Aguardamos você! 💚'
       )
     }
 
@@ -115,8 +115,8 @@ export function buildWaMessage(type: WaMessageType, d: WaData): string {
         `Infelizmente *${d.professional_name}* precisou cancelar seu ${lbl}.`,
         '',
         SEP,
-        `\u{1F4C5} *Data:* ${d.appt_date}`,
-        `\u{1F552} *Horário:* ${d.appt_time}`,
+        `📅 *Data:* ${d.appt_date}`,
+        `🕒 *Horário:* ${d.appt_time}`,
         SEP,
         '',
         'Para remarcar, entre em contato diretamente com o profissional.'
@@ -124,32 +124,32 @@ export function buildWaMessage(type: WaMessageType, d: WaData): string {
 
     case 'rescheduled':
       return L(
-        `\u{1F504} *${cap(lbl)} remarcado*`,
+        `🔄 *${cap(lbl)} remarcado*`,
         '',
         `Olá, *${d.client_name}*!`,
         '',
         `Seu ${lbl} com *${d.professional_name}* foi remarcado.`,
         '',
         SEP,
-        `\u{1F4C5} *Nova data:* ${d.new_date}`,
-        `\u{1F552} *Novo horário:* ${d.new_time}`,
+        `📅 *Nova data:* ${d.new_date}`,
+        `🕒 *Novo horário:* ${d.new_time}`,
         SEP,
         '',
-        'Até breve! \u{1F49A}'
+        'Até breve! 💚'
       )
 
     case 'link_updated':
       return L(
-        '\u{1F4BB} *Link atualizado*',
+        '💻 *Link atualizado*',
         '',
         `Olá, *${d.client_name}*!`,
         '',
         `O link do seu ${lbl} com *${d.professional_name}* foi atualizado.`,
         '',
         SEP,
-        `\u{1F4C5} *Data:* ${d.appt_date}`,
-        `\u{1F552} *Horário:* ${d.appt_time}`,
-        '\u{1F4BB} *Novo link:*',
+        `📅 *Data:* ${d.appt_date}`,
+        `🕒 *Horário:* ${d.appt_time}`,
+        '💻 *Novo link:*',
         d.meeting_link ?? '',
         SEP,
         '',
@@ -159,33 +159,33 @@ export function buildWaMessage(type: WaMessageType, d: WaData): string {
     case 'reminder_24h': {
       const loc: string[] = []
       if (d.modality === 'Online' && d.meeting_link) {
-        loc.push('', '\u{1F4BB} *Link:*', d.meeting_link)
+        loc.push('', '💻 *Link:*', d.meeting_link)
       } else if (d.modality === 'Presencial' && d.address) {
-        loc.push('', `\u{1F4CD} *Endereço:* ${d.address}`)
+        loc.push('', `📍 *Endereço:* ${d.address}`)
       }
       return L(
-        `\u{1F514} *Lembrete de ${lbl}*`,
+        `🔔 *Lembrete de ${lbl}*`,
         '',
         `Olá, *${d.client_name}*! Seu ${lbl} é amanhã.`,
         '',
         SEP,
-        d.professional_name ? `\u{1FA7A} *Profissional:* ${d.professional_name}` : null,
-        `\u{1F4C5} *Data:* ${d.appt_date}`,
-        `\u{1F552} *Horário:* ${d.appt_time}`,
-        d.modality ? `\u{1F4CD} *Modalidade:* ${d.modality}` : null,
+        d.professional_name ? `🩺 *Profissional:* ${d.professional_name}` : null,
+        `📅 *Data:* ${d.appt_date}`,
+        `🕒 *Horário:* ${d.appt_time}`,
+        d.modality ? `📍 *Modalidade:* ${d.modality}` : null,
         SEP,
         ...loc,
         '',
-        'Até breve! \u{1F49A}'
+        'Até breve! 💚'
       )
     }
 
     case 'reminder_2h': {
       const loc: string[] = []
       if (d.modality === 'Online' && d.meeting_link) {
-        loc.push('', '\u{1F4BB} *Link:*', d.meeting_link)
+        loc.push('', '💻 *Link:*', d.meeting_link)
       } else if (d.modality === 'Presencial' && d.address) {
-        loc.push('', `\u{1F4CD} *Endereço:* ${d.address}`)
+        loc.push('', `📍 *Endereço:* ${d.address}`)
       }
       return L(
         `⏰ *Seu ${lbl} começa em breve!*`,
@@ -193,30 +193,30 @@ export function buildWaMessage(type: WaMessageType, d: WaData): string {
         `Olá, *${d.client_name}*! Seu ${lbl} começa em 2 horas.`,
         '',
         SEP,
-        d.professional_name ? `\u{1FA7A} *Profissional:* ${d.professional_name}` : null,
-        `\u{1F4C5} *Data:* ${d.appt_date}`,
-        `\u{1F552} *Horário:* ${d.appt_time}`,
+        d.professional_name ? `🩺 *Profissional:* ${d.professional_name}` : null,
+        `📅 *Data:* ${d.appt_date}`,
+        `🕒 *Horário:* ${d.appt_time}`,
         SEP,
         ...loc,
         '',
-        'Até breve! \u{1F49A}'
+        'Até breve! 💚'
       )
     }
 
     case 'post_appointment':
       return L(
-        `\u{1F64F} *Obrigado pelo seu ${lbl}!*`,
+        `🙏 *Obrigado pelo seu ${lbl}!*`,
         '',
         `Olá, *${d.client_name}*!`,
         '',
         'Foi um prazer atendê-lo(a). Esperamos que tudo tenha corrido bem.',
         '',
         SEP,
-        `\u{1F4C5} *Data:* ${d.appt_date}`,
-        `\u{1F552} *Horário:* ${d.appt_time}`,
+        `📅 *Data:* ${d.appt_date}`,
+        `🕒 *Horário:* ${d.appt_time}`,
         SEP,
         '',
-        'Se precisar remarcar ou tiver alguma dúvida, estamos à disposição. \u{1F49A}'
+        'Se precisar remarcar ou tiver alguma dúvida, estamos à disposição. 💚'
       )
 
     default:
