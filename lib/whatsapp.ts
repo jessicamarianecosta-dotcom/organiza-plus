@@ -80,31 +80,31 @@ export function buildWaMessage(type: WaMessageType, d: WaData): string {
     case 'confirmed': {
       const loc: string[] = []
       if (d.modality === 'Online' && d.meeting_link) {
-        loc.push('', '*Link da reuniao:*', d.meeting_link)
+        loc.push('', '🔗 *Link da reuniao:*', d.meeting_link)
       } else if (d.modality === 'Presencial' && (d.clinic_name || d.address)) {
-        if (d.clinic_name) loc.push('', `*Local:* ${d.clinic_name}`)
-        if (d.address)     loc.push(`*Endereco:* ${d.address}`)
-        if (d.maps_link)   loc.push(`*Google Maps:* ${d.maps_link}`)
+        if (d.clinic_name) loc.push('', `📍 *Local:* ${d.clinic_name}`)
+        if (d.address)     loc.push(`🏠 *Endereco:* ${d.address}`)
+        if (d.maps_link)   loc.push(`🗺️ *Google Maps:* ${d.maps_link}`)
       }
       return L(
-        `Ola, *${d.client_name}*.`,
+        `Ola, *${d.client_name}*. 👋`,
         '',
-        `Seu ${lbl} com *${d.professional_name}* foi confirmado.`,
+        `Seu ${lbl} com *${d.professional_name}* foi confirmado. ✅`,
         '',
         SEP,
         '',
-        `*Data:* ${d.appt_date}`,
-        `*Horario:* ${d.appt_time}`,
-        d.professional_specialty ? `*Especialidade:* ${d.professional_specialty}` : null,
-        d.modality ? `*Modalidade:* ${d.modality}` : null,
-        d.price    ? `*Valor:* ${d.price}` : null,
+        `📅 *Data:* ${d.appt_date}`,
+        `🕐 *Horario:* ${d.appt_time}`,
+        d.professional_specialty ? `🩺 *Especialidade:* ${d.professional_specialty}` : null,
+        d.modality ? `${d.modality === 'Online' ? '💻' : '📍'} *Modalidade:* ${d.modality}` : null,
+        d.price    ? `💰 *Valor:* ${d.price}` : null,
         ...loc,
         '',
         SEP,
         '',
         'Em caso de imprevisto, avise com antecedencia.',
         '',
-        'Aguardamos voce!'
+        'Aguardamos voce! 😊'
       )
     }
 
