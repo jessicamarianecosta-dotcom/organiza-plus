@@ -4,14 +4,24 @@
  * (editor, Git, bundler) corrompa esses caracteres especiais em transito.
  */
 const EMOJI = {
-  clipboard: String.fromCodePoint(0x1f4cb), // 📋
-  bell:      String.fromCodePoint(0x1f514), // 🔔
-  check:     String.fromCodePoint(0x2705),  // ✅
-  cross:     String.fromCodePoint(0x274c),  // ❌
-  refresh:   String.fromCodePoint(0x1f504), // 🔄
-  link:      String.fromCodePoint(0x1f517), // 🔗
-  clock:     String.fromCodePoint(0x23f0),  // ⏰
-  pray:      String.fromCodePoint(0x1f64f), // 🙏
+  clipboard:   String.fromCodePoint(0x1f4cb), // 📋
+  bell:        String.fromCodePoint(0x1f514), // 🔔
+  check:       String.fromCodePoint(0x2705),  // ✅
+  cross:       String.fromCodePoint(0x274c),  // ❌
+  refresh:     String.fromCodePoint(0x1f504), // 🔄
+  link:        String.fromCodePoint(0x1f517), // 🔗
+  clock:       String.fromCodePoint(0x23f0),  // ⏰
+  pray:        String.fromCodePoint(0x1f64f), // 🙏
+  wave:        String.fromCodePoint(0x1f44b), // 👋
+  smile:       String.fromCodePoint(0x1f60a), // 😊
+  calendar:    String.fromCodePoint(0x1f4c5), // 📅
+  clockFace:   String.fromCodePoint(0x1f550), // 🕐
+  stethoscope: String.fromCodePoint(0x1fa7a), // 🩺
+  laptop:      String.fromCodePoint(0x1f4bb), // 💻
+  pin:         String.fromCodePoint(0x1f4cd), // 📍
+  money:       String.fromCodePoint(0x1f4b0), // 💰
+  house:       String.fromCodePoint(0x1f3e0), // 🏠
+  map:         String.fromCodePoint(0x1f5fa, 0xfe0f), // 🗺️
 }
 
 export type WaMessageType =
@@ -96,31 +106,31 @@ export function buildWaMessage(type: WaMessageType, d: WaData): string {
     case 'confirmed': {
       const loc: string[] = []
       if (d.modality === 'Online' && d.meeting_link) {
-        loc.push('', '*Link da reuniao:*', d.meeting_link)
+        loc.push('', `${EMOJI.link} *Link da reuniao:*`, d.meeting_link)
       } else if (d.modality === 'Presencial' && (d.clinic_name || d.address)) {
-        if (d.clinic_name) loc.push('', `*Local:* ${d.clinic_name}`)
-        if (d.address)     loc.push(`*Endereco:* ${d.address}`)
-        if (d.maps_link)   loc.push(`*Google Maps:* ${d.maps_link}`)
+        if (d.clinic_name) loc.push('', `${EMOJI.pin} *Local:* ${d.clinic_name}`)
+        if (d.address)     loc.push(`${EMOJI.house} *Endereco:* ${d.address}`)
+        if (d.maps_link)   loc.push(`${EMOJI.map} *Google Maps:* ${d.maps_link}`)
       }
       return L(
-        `${EMOJI.check} Ola, *${d.client_name}*.`,
+        `${EMOJI.check} Ola, *${d.client_name}*. ${EMOJI.wave}`,
         '',
-        `Seu ${lbl} com *${d.professional_name}* foi confirmado.`,
+        `Seu ${lbl} com *${d.professional_name}* foi confirmado. ${EMOJI.check}`,
         '',
         SEP,
         '',
-        `*Data:* ${d.appt_date}`,
-        `*Horario:* ${d.appt_time}`,
-        d.professional_specialty ? `*Especialidade:* ${d.professional_specialty}` : null,
-        d.modality ? `*Modalidade:* ${d.modality}` : null,
-        d.price    ? `*Valor:* ${d.price}` : null,
+        `${EMOJI.calendar} *Data:* ${d.appt_date}`,
+        `${EMOJI.clockFace} *Horario:* ${d.appt_time}`,
+        d.professional_specialty ? `${EMOJI.stethoscope} *Especialidade:* ${d.professional_specialty}` : null,
+        d.modality ? `${d.modality === 'Online' ? EMOJI.laptop : EMOJI.pin} *Modalidade:* ${d.modality}` : null,
+        d.price    ? `${EMOJI.money} *Valor:* ${d.price}` : null,
         ...loc,
         '',
         SEP,
         '',
         'Em caso de imprevisto, avise com antecedencia.',
         '',
-        'Aguardamos voce!'
+        `Aguardamos voce! ${EMOJI.smile}`
       )
     }
 
