@@ -1,3 +1,19 @@
+/**
+ * Emojis gerados a partir do codigo numerico Unicode (nao como caracteres
+ * literais no arquivo) — evita que qualquer etapa da cadeia de build/deploy
+ * (editor, Git, bundler) corrompa esses caracteres especiais em transito.
+ */
+const EMOJI = {
+  clipboard: String.fromCodePoint(0x1f4cb), // 📋
+  bell:      String.fromCodePoint(0x1f514), // 🔔
+  check:     String.fromCodePoint(0x2705),  // ✅
+  cross:     String.fromCodePoint(0x274c),  // ❌
+  refresh:   String.fromCodePoint(0x1f504), // 🔄
+  link:      String.fromCodePoint(0x1f517), // 🔗
+  clock:     String.fromCodePoint(0x23f0),  // ⏰
+  pray:      String.fromCodePoint(0x1f64f), // 🙏
+}
+
 export type WaMessageType =
   | 'booking_received'
   | 'new_booking'
@@ -43,7 +59,7 @@ export function buildWaMessage(type: WaMessageType, d: WaData): string {
   switch (type) {
     case 'booking_received':
       return L(
-        `Ola, *${d.client_name}*.`,
+        `${EMOJI.clipboard} Ola, *${d.client_name}*.`,
         '',
         `Recebemos sua solicitacao de ${lbl}.`,
         '',
@@ -61,7 +77,7 @@ export function buildWaMessage(type: WaMessageType, d: WaData): string {
 
     case 'new_booking':
       return L(
-        `Novo ${lbl} recebido.`,
+        `${EMOJI.bell} Novo ${lbl} recebido.`,
         '',
         SEP,
         '',
@@ -87,7 +103,7 @@ export function buildWaMessage(type: WaMessageType, d: WaData): string {
         if (d.maps_link)   loc.push(`*Google Maps:* ${d.maps_link}`)
       }
       return L(
-        `Ola, *${d.client_name}*.`,
+        `${EMOJI.check} Ola, *${d.client_name}*.`,
         '',
         `Seu ${lbl} com *${d.professional_name}* foi confirmado.`,
         '',
@@ -110,7 +126,7 @@ export function buildWaMessage(type: WaMessageType, d: WaData): string {
 
     case 'cancelled':
       return L(
-        `Ola, *${d.client_name}*.`,
+        `${EMOJI.cross} Ola, *${d.client_name}*.`,
         '',
         `Seu ${lbl} com *${d.professional_name}* foi cancelado.`,
         '',
@@ -126,7 +142,7 @@ export function buildWaMessage(type: WaMessageType, d: WaData): string {
 
     case 'rescheduled':
       return L(
-        `Ola, *${d.client_name}*.`,
+        `${EMOJI.refresh} Ola, *${d.client_name}*.`,
         '',
         `Seu ${lbl} com *${d.professional_name}* foi remarcado.`,
         '',
@@ -142,7 +158,7 @@ export function buildWaMessage(type: WaMessageType, d: WaData): string {
 
     case 'link_updated':
       return L(
-        `Ola, *${d.client_name}*.`,
+        `${EMOJI.link} Ola, *${d.client_name}*.`,
         '',
         `O link do seu ${lbl} com *${d.professional_name}* foi atualizado.`,
         '',
@@ -167,7 +183,7 @@ export function buildWaMessage(type: WaMessageType, d: WaData): string {
         loc.push('', `*Endereco:* ${d.address}`)
       }
       return L(
-        `Ola, *${d.client_name}*.`,
+        `${EMOJI.clock} Ola, *${d.client_name}*.`,
         '',
         `Seu ${lbl} esta agendado para amanha.`,
         '',
@@ -193,7 +209,7 @@ export function buildWaMessage(type: WaMessageType, d: WaData): string {
         loc.push('', `*Endereco:* ${d.address}`)
       }
       return L(
-        `Ola, *${d.client_name}*.`,
+        `${EMOJI.clock} Ola, *${d.client_name}*.`,
         '',
         `Seu ${lbl} comeca em 2 horas.`,
         '',
@@ -212,7 +228,7 @@ export function buildWaMessage(type: WaMessageType, d: WaData): string {
 
     case 'post_appointment':
       return L(
-        `Ola, *${d.client_name}*.`,
+        `${EMOJI.pray} Ola, *${d.client_name}*.`,
         '',
         `Obrigado pelo seu ${lbl}!`,
         '',
@@ -233,9 +249,26 @@ export function buildWaMessage(type: WaMessageType, d: WaData): string {
   }
 }
 
+/**
+ * No celular, o wa.me faz o deep-link direto pro app e preserva os emojis
+ * sem problema. No computador, o mesmo wa.me passa por um redirecionamento
+ * (wa.me → api.whatsapp.com/send) que corrompe especificamente os emojis
+ * (texto acentuado e demais simbolos chegam intactos). Por isso, no
+ * desktop usamos o endereco direto do WhatsApp Web, pulando esse
+ * redirecionamento problematico.
+ */
+function isMobileDevice(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+}
+
 export function buildWaLink(phone: string, type: WaMessageType, data: WaData): string {
   const digits = phone.replace(/\D/g, '')
   const to = digits.startsWith('55') ? digits : `55${digits}`
   const message = buildWaMessage(type, data)
-  return `https://wa.me/${to}?text=${encodeURIComponent(message)}`
+  const encodedMessage = encodeURIComponent(message)
+  if (isMobileDevice()) {
+    return `https://wa.me/${to}?text=${encodedMessage}`
+  }
+  return `https://web.whatsapp.com/send?phone=${to}&text=${encodedMessage}`
 }
