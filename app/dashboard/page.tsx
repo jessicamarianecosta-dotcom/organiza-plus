@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { supabase, Profile, Appointment } from '@/lib/supabase'
+import { supabase, getUserSafe, withTimeout, Profile, Appointment } from '@/lib/supabase'
 import { T, GlobalStyles, Btn, Badge, Input, Alert, ProgressBar } from '@/lib/ds'
 import DynamicSpecialties from '@/lib/DynamicSpecialties'
 import PhotoCropper from '@/lib/PhotoCropper'
@@ -66,9 +66,11 @@ function DashboardContent() {
 
   const load = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { user } = await getUserSafe()
       if (!user) { router.push('/login'); return }
-      const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      const { data: p } = await withTimeout(
+        supabase.from('profiles').select('*').eq('id', user.id).single()
+      )
       if (!p) { router.push('/onboarding'); return }
       if (!p.onboarding_done) { router.push('/onboarding'); return }
       setProfile(p)

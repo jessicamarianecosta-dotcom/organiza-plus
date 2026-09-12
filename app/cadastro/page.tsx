@@ -2,7 +2,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { supabase, getUserSafe, withTimeout } from '@/lib/supabase'
 import { T, GlobalStyles } from '@/lib/ds'
 
 const PROFESSIONS = [
@@ -65,10 +65,13 @@ function CadastroForm() {
     setMounted(true)
     ;(async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
+        const { user } = await getUserSafe()
         if (!user) { setChecking(false); return }
-        const { data: p } = await supabase.from('profiles').select('onboarding_done').eq('id', user.id).single()
-        void router.push(p?.onboarding_done ? '/dashboard' : '/onboarding')
+        const { data: p } = await withTimeout(
+          supabase.from('profiles').select('onboarding_done').eq('id', user.id).single()
+        )
+        if (!p) { setChecking(false); return }
+        void router.push(p.onboarding_done ? '/dashboard' : '/onboarding')
       } catch {
         setChecking(false)
       }

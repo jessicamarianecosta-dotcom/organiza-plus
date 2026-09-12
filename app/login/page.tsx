@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { supabase, getUserSafe, withTimeout } from '@/lib/supabase'
 
 const C = { sage:'#7A9E87', sageG:'#EAF3EC', sageP:'#D6E8DA', dark:'#2C3530', mid:'#5A6660', muted:'#8A9690', cream:'#FAFAF7', off:'#F7F5F0', nude:'#EDE8E0', white:'#FFFFFF', red:'#ef4444', redL:'#fef2f2', redB:'#fecaca' }
 
@@ -10,16 +10,13 @@ type Router = ReturnType<typeof useRouter>
 
 async function redirectAfterAuth(userId: string, router: Router) {
   // Check if profile exists and onboarding is done
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('onboarding_done')
-    .eq('id', userId)
-    .single()
-
-  if (!profile || !profile.onboarding_done) {
+  try {
+    const { data: profile } = await withTimeout(
+      supabase.from('profiles').select('onboarding_done').eq('id', userId).single()
+    )
+    router.push(profile?.onboarding_done ? '/dashboard' : '/onboarding')
+  } catch {
     router.push('/onboarding')
-  } else {
-    router.push('/dashboard')
   }
 }
 
@@ -35,15 +32,13 @@ export default function Login() {
 
   useEffect(() => {
     setMounted(true)
-    supabase.auth.getUser()
-      .then(({ data: { user } }) => {
-        if (user) {
-          redirectAfterAuth(user.id, router)
-        } else {
-          setChecking(false)
-        }
-      })
-      .catch(() => setChecking(false))
+    getUserSafe().then(({ user }) => {
+      if (user) {
+        redirectAfterAuth(user.id, router)
+      } else {
+        setChecking(false)
+      }
+    })
   }, [router])
 
   async function handleLogin(e: React.FormEvent) {

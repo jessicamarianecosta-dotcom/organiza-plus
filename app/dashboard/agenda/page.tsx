@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
+import { supabase, getUserSafe, withTimeout } from '@/lib/supabase'
 import { T, GlobalStyles } from '@/lib/ds'
 import { ChevronLeft, ChevronRight, Plus, Check, Trash2, Bell, Clock, ArrowLeft, Flag, X, Edit2, Save, Search } from 'lucide-react'
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameMonth, isSameDay, isToday, parseISO, isBefore } from 'date-fns'
@@ -61,10 +61,12 @@ export default function AgendaPage() {
   const [taskFilter, setTaskFilter] = useState<'all'|'today'|'pending'|'done'>('all')
 
   const load = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { user } = await getUserSafe()
     if (!user) { router.push('/login'); return }
     setUid(user.id)
-    const { data: profile } = await supabase.from('profiles').select('id').eq('id', user.id).single()
+    const { data: profile } = await withTimeout(
+      supabase.from('profiles').select('id').eq('id', user.id).single()
+    ).catch(() => ({ data: null }))
     if (!profile) { router.push('/onboarding'); return }
     setProfId(profile.id)
     const now = new Date()

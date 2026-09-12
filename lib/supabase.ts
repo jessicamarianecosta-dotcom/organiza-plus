@@ -1,9 +1,31 @@
 import { createBrowserClient } from '@supabase/ssr'
+import type { User } from '@supabase/supabase-js'
 
 export const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
+
+// A hung/blocked request (bad network, stale session token) left pages stuck
+// on their "checking session" spinner forever (e.g. /cadastro). Wrap any
+// promise that gates page render with this so it always settles.
+export function withTimeout<T>(promise: PromiseLike<T>, timeoutMs = 6000): Promise<T> {
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), timeoutMs)),
+  ])
+}
+
+// Every page-mount auth check should use this instead of calling
+// supabase.auth.getUser() directly — see withTimeout above.
+export async function getUserSafe(timeoutMs = 6000): Promise<{ user: User | null }> {
+  try {
+    const { data } = await withTimeout(supabase.auth.getUser(), timeoutMs)
+    return { user: data.user }
+  } catch {
+    return { user: null }
+  }
+}
 
 export type Profile = {
   id: string

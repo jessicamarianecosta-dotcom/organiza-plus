@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { supabase, getUserSafe, withTimeout } from '@/lib/supabase'
 import { T, GlobalStyles } from '@/lib/ds'
 import DynamicSpecialties from '@/lib/DynamicSpecialties'
 import ScheduleConfig, { defaultWeek, weekConfigToRows, WeekConfig, BlockedSlot } from '@/lib/ScheduleConfig'
@@ -145,9 +145,11 @@ export default function Onboarding() {
     setMounted(true)
     ;(async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
+        const { user } = await getUserSafe()
         if (!user) { void router.push('/login'); return }
-        const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+        const { data: p } = await withTimeout(
+          supabase.from('profiles').select('*').eq('id', user.id).single()
+        )
         if (!p) { void router.push('/cadastro'); return }
         if (p.onboarding_done) { void router.push('/dashboard'); return }
         setPid(p.id); setSlug(p.slug || '')

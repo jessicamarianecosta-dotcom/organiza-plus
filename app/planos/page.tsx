@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
+import { supabase, getUserSafe } from '@/lib/supabase'
 import { T, GlobalStyles } from '@/lib/ds'
 import { Check, ArrowLeft, Zap, Shield, Star } from 'lucide-react'
 
@@ -35,7 +35,7 @@ export default function Planos() {
 
   useEffect(() => {
     setMounted(true)
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    getUserSafe().then(({ user }) => {
       if (!user) return
       setUser({ id: user.id, email: user.email || '' })
       supabase.from('profiles').select('plan,plan_active').eq('id', user.id).single()

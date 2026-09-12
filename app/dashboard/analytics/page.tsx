@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
+import { supabase, getUserSafe } from '@/lib/supabase'
 import { T, GlobalStyles } from '@/lib/ds'
 import { ArrowLeft, TrendingUp, Users, Calendar, Eye, MessageCircle, BarChart2, Clock } from 'lucide-react'
 import { format, subDays } from 'date-fns'
@@ -20,7 +20,7 @@ export default function Analytics() {
   const [profileName, setProfileName] = useState('')
 
   const load = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { user } = await getUserSafe()
     if (!user) { router.push('/login'); return }
 
     const now = new Date()
