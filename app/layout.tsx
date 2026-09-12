@@ -1,5 +1,6 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import { RegisterServiceWorker } from './register-sw'
 
 export const metadata: Metadata = {
   title: 'Organiza+ | Agendamento profissional online',
@@ -20,6 +21,10 @@ export const metadata: Metadata = {
   },
 }
 
+export const viewport: Viewport = {
+  themeColor: '#2C3530',
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR">
@@ -32,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         MozOsxFontSmoothing: 'grayscale',
       }}>
         {children}
+        <RegisterServiceWorker/>
       </body>
     </html>
   )

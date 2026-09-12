@@ -240,12 +240,8 @@ export function H3({ children, style }: { children: React.ReactNode, style?: CSS
 // ─── LOGO ────────────────────────────────────────────────────────────────────
 export function Logo({ size=20 }: { size?: number }) {
   return (
-    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-      <div style={{ width:size*0.45, height:size*0.45, borderRadius:'50%', background:T.sage }}/>
-      <span style={{ fontFamily:T.fontSerif, fontSize:size, color:T.dark, lineHeight:1 }}>
-        Organiza<span style={{ color:T.sage }}>+</span>
-      </span>
-    </div>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src="/logo.svg" alt="Organiza+" style={{ height:size*2.2, width:'auto', display:'block' }}/>
   )
 }
 

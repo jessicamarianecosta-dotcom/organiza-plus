@@ -68,7 +68,8 @@ export default function Login() {
     return (
       <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#F7F5F0', fontFamily:'system-ui' }}>
         <div style={{ textAlign:'center' }}>
-          <div style={{ fontFamily:'Georgia,serif', fontSize:22, color:'#2C3530', marginBottom:12 }}>Organiza<span style={{ color:'#7A9E87' }}>+</span></div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.svg" alt="Organiza+" style={{ height:48, width:'auto', marginBottom:12 }}/>
           <p style={{ fontSize:13, color:'#8A9690' }}>Verificando sessão...</p>
         </div>
       </div>
@@ -84,9 +85,9 @@ export default function Login() {
           ← Voltar ao início
         </Link>
         <div style={{ background:C.white, borderRadius:24, padding:'40px', boxShadow:'0 8px 40px rgba(44,53,48,0.10), 0 0 0 1px rgba(237,232,224,0.5)' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:24 }}>
-            <span style={{ width:8, height:8, borderRadius:'50%', background:C.sage, display:'inline-block' }}/>
-            <span style={{ fontFamily:"'DM Serif Display',Georgia,serif", fontSize:20, color:C.dark }}>Organiza<span style={{ color:C.sage }}>+</span></span>
+          <div style={{ marginBottom:24 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.svg" alt="Organiza+" style={{ height:44, width:'auto' }}/>
           </div>
           <h1 style={{ fontFamily:"'DM Serif Display',Georgia,serif", fontSize:26, color:C.dark, margin:'0 0 6px' }}>Bem-vindo de volta</h1>
           <p style={{ fontSize:14, color:C.muted, margin:'0 0 28px' }}>Entre na sua conta para acessar o painel.</p>

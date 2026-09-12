@@ -244,7 +244,8 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
     <div style={{ minHeight:'100vh', background:T.cream, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:T.fontSans }}>
       <GlobalStyles/>
       <div style={{ textAlign:'center' }}>
-        <div style={{ fontFamily:T.fontSerif, fontSize:26, color:T.dark, marginBottom:14 }}>Organiza<span style={{ color:T.sage }}>+</span></div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.svg" alt="Organiza+" style={{ height:52, width:'auto', marginBottom:14 }}/>
         <div style={{ width:28, height:28, border:`3px solid ${T.sageP}`, borderTopColor:T.sage, borderRadius:'50%', animation:'spin 0.7s linear infinite', margin:'0 auto' }}/>
       </div>
     </div>
@@ -313,9 +314,8 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
         boxShadow: scrolled ? T.shadowSm : 'none',
         transition:'all 0.3s ease',
       }}>
-        <span style={{ fontFamily:T.fontSerif, fontSize:'clamp(14px,3vw,16px)', color: scrolled ? T.dark : '#FAFAF7', transition:'color 0.3s', whiteSpace:'nowrap' }}>
-          Organiza<span style={{ color:th.primary }}>+</span>
-        </span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.svg" alt="Organiza+" style={{ height:'clamp(26px,5vw,32px)', width:'auto' }}/>
         <button onClick={scrollToBook} className="nav-cta"
           style={{ background:th.primary, color:'#FAFAF7', borderRadius:T.r100, fontWeight:700, border:'none', cursor:'pointer', fontFamily:T.fontSans, boxShadow:`0 4px 14px ${th.primary}44`, transition:'all 0.2s', whiteSpace:'nowrap' }}
           onMouseEnter={e=>{e.currentTarget.style.background=th.mid;e.currentTarget.style.transform='translateY(-1px)'}}
@@ -846,8 +846,10 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
           </div>
           <div style={{ borderTop:'1px solid rgba(255,255,255,0.08)', paddingTop:24, display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
             <p style={{ fontSize:12, color:'rgba(255,255,255,0.2)', margin:0 }}>© 2025 {profile.name}. Todos os direitos reservados.</p>
-            <p style={{ fontSize:12, color:'rgba(255,255,255,0.2)', margin:0 }}>
-              Powered by <span style={{ fontWeight:700, color:th.primary }}>Organiza+</span>
+            <p style={{ fontSize:12, color:'rgba(255,255,255,0.2)', margin:0, display:'flex', alignItems:'center', gap:6 }}>
+              Powered by
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.svg" alt="Organiza+" style={{ height:16, width:'auto', verticalAlign:'middle' }}/>
             </p>
           </div>
         </div>
