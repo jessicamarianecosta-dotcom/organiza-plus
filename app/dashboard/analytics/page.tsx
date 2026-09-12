@@ -66,7 +66,8 @@ export default function Analytics() {
     <div style={{ minHeight:'100vh', background:T.off, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:T.fontSans }}>
       <GlobalStyles/>
       <div style={{ textAlign:'center' }}>
-        <div style={{ fontFamily:T.fontSerif, fontSize:24, color:T.dark, marginBottom:12 }}>Organiza<span style={{ color:T.sage }}>+</span></div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.svg" alt="Organiza+" style={{ height:52, width:'auto', marginBottom:12 }}/>
         <div style={{ width:28, height:28, border:`3px solid ${T.sageP}`, borderTopColor:T.sage, borderRadius:'50%', animation:'spin 0.8s linear infinite', margin:'0 auto' }}/>
       </div>
     </div>
@@ -87,7 +88,8 @@ export default function Analytics() {
             <ArrowLeft size={15}/> Dashboard
           </Link>
           <span style={{ color:T.nude, userSelect:'none' }}>|</span>
-          <span style={{ fontFamily:T.fontSerif, fontSize:18, color:T.dark }}>Organiza<span style={{ color:T.sage }}>+</span></span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.svg" alt="Organiza+" style={{ height:32, width:'auto' }}/>
           <span style={{ marginLeft:'auto', fontSize:13, color:T.muted }}>Analytics · {profileName}</span>
         </div>
       </div>

@@ -185,7 +185,8 @@ function CadastroForm() {
     <div style={{ minHeight:'100vh', background:T.off, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:T.fontSans }}>
       <GlobalStyles/>
       <div style={{ textAlign:'center' }}>
-        <div style={{ fontFamily:T.fontSerif, fontSize:22, color:T.dark, marginBottom:12 }}>Organiza<span style={{ color:T.sage }}>+</span></div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.svg" alt="Organiza+" style={{ height:48, width:'auto', marginBottom:12 }}/>
         <div style={{ width:24, height:24, border:`3px solid ${T.sageP}`, borderTopColor:T.sage, borderRadius:'50%', animation:'spin 0.7s linear infinite', margin:'0 auto' }}/>
       </div>
     </div>
@@ -216,10 +217,8 @@ function CadastroForm() {
         <div style={{ background:T.white, borderRadius:T.r24, padding:'36px', boxShadow:`0 8px 40px rgba(44,53,48,0.10), 0 0 0 1px rgba(237,232,224,0.5)` }}>
           {/* Logo */}
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:22 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-              <div style={{ width:8, height:8, borderRadius:'50%', background:T.sage }}/>
-              <span style={{ fontFamily:T.fontSerif, fontSize:20, color:T.dark }}>Organiza<span style={{ color:T.sage }}>+</span></span>
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.svg" alt="Organiza+" style={{ height:44, width:'auto' }}/>
             <span style={{ background:T.sageG, color:T.sage, fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:T.r100, border:`1px solid ${T.sageP}` }}>
               {plano==='premium'?'💎 Premium':'🌿 Basic'}
             </span>
@@ -330,7 +329,8 @@ export default function Cadastro() {
   return (
     <Suspense fallback={
       <div style={{ minHeight:'100vh', background:'#F7F5F0', display:'flex', alignItems:'center', justifyContent:'center' }}>
-        <p style={{ fontFamily:'Georgia,serif', fontSize:20, color:'#2C3530' }}>Organiza<span style={{ color:'#7A9E87' }}>+</span></p>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.svg" alt="Organiza+" style={{ height:44, width:'auto' }}/>
       </div>
     }>
       <CadastroForm/>

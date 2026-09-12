@@ -72,10 +72,8 @@ export default function Planos() {
             <ArrowLeft size={15}/> Dashboard
           </Link>
           <span style={{ color:T.nude }}>|</span>
-          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-            <div style={{ width:7, height:7, borderRadius:'50%', background:T.sage }}/>
-            <span style={{ fontFamily:T.fontSerif, fontSize:18, color:T.dark }}>Organiza<span style={{ color:T.sage }}>+</span></span>
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.svg" alt="Organiza+" style={{ height:32, width:'auto' }}/>
         </div>
       </div>
 

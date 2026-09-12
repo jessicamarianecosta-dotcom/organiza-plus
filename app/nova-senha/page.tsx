@@ -30,9 +30,9 @@ export default function NovaSenha() {
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap'); *{box-sizing:border-box;} input::placeholder{color:#8A9690;}`}</style>
       <div style={{ width:'100%', maxWidth:420 }}>
         <div style={{ background:C.white, borderRadius:24, padding:'36px', boxShadow:'0 8px 40px rgba(44,53,48,0.10)' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:24 }}>
-            <span style={{ width:8, height:8, borderRadius:'50%', background:C.sage, display:'inline-block' }}/>
-            <span style={{ fontFamily:"'DM Serif Display', Georgia, serif", fontSize:20, color:C.dark }}>Organiza<span style={{ color:C.sage }}>+</span></span>
+          <div style={{ marginBottom:24 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.svg" alt="Organiza+" style={{ height:44, width:'auto' }}/>
           </div>
           {done ? (
             <div style={{ textAlign:'center', padding:'20px 0' }}>

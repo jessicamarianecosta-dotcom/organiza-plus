@@ -233,7 +233,8 @@ function DashboardContent() {
     <div style={{ minHeight:'100vh', background:T.off, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:T.fontSans }}>
       <GlobalStyles/>
       <div style={{ textAlign:'center' }}>
-        <div style={{ fontFamily:T.fontSerif, fontSize:28, color:T.dark, marginBottom:12 }}>Organiza<span style={{ color:T.sage }}>+</span></div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.svg" alt="Organiza+" style={{ height:60, width:'auto', marginBottom:12 }}/>
         <div style={{ width:32, height:32, border:`3px solid ${T.sageP}`, borderTopColor:T.sage, borderRadius:'50%', animation:'spin 0.8s linear infinite', margin:'0 auto' }}/>
       </div>
     </div>
@@ -430,12 +431,8 @@ function DashboardContent() {
         <style>{`.sidebar { @media(max-width:767px){ transform: ${sidebarOpen?'translateX(0)':'translateX(-224px)'}; } }`}</style>
         {/* Logo */}
         <div style={{ padding:'22px 20px 18px', borderBottom:'1px solid rgba(255,255,255,0.08)', marginBottom:8 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-            <div style={{ width:8, height:8, borderRadius:'50%', background:T.sage }}/>
-            <span style={{ fontFamily:T.fontSerif, fontSize:18, color:T.cream }}>
-              Organiza<span style={{ color:T.sageL }}>+</span>
-            </span>
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.svg" alt="Organiza+" style={{ height:36, width:'auto' }}/>
         </div>
 
         {/* Nav items */}
@@ -495,7 +492,8 @@ function DashboardContent() {
         <button onClick={()=>setSidebarOpen(!sidebarOpen)} style={{ background:'none', border:'none', color:T.cream, cursor:'pointer', padding:4 }}>
           <Menu size={22}/>
         </button>
-        <span style={{ fontFamily:T.fontSerif, fontSize:18, color:T.cream }}>Organiza<span style={{ color:T.sageL }}>+</span></span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.svg" alt="Organiza+" style={{ height:32, width:'auto' }}/>
         {profile && <Link href={`/p/${profile.slug}`} target="_blank" style={{ color:'rgba(255,255,255,0.4)', display:'flex' }}><Globe size={18}/></Link>}
       </header>
 

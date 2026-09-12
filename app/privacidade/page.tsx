@@ -13,7 +13,8 @@ export default function Privacidade() {
             <ArrowLeft size={15}/> Início
           </Link>
           <span style={{ color:T.nude }}>|</span>
-          <span style={{ fontFamily:T.fontSerif, fontSize:18, color:T.dark }}>Organiza<span style={{ color:T.sage }}>+</span></span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.svg" alt="Organiza+" style={{ height:32, width:'auto' }}/>
         </div>
       </div>
 
