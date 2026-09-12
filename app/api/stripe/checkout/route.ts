@@ -34,8 +34,8 @@ export async function POST(req: NextRequest) {
     const email = user.email
 
     const PLANS: Record<string, { name: string; amount: number; priceId?: string }> = {
-      basic:   { name: '🌿 Organiza+ Basic',   amount: 2700, priceId: process.env.STRIPE_PRICE_BASIC },
-      premium: { name: '💎 Organiza+ Premium', amount: 4700, priceId: process.env.STRIPE_PRICE_PREMIUM },
+      basic:   { name: '🌿 Organiza+ Basic',   amount: 1700, priceId: process.env.STRIPE_PRICE_BASIC },
+      premium: { name: '💎 Organiza+ Premium', amount: 3700, priceId: process.env.STRIPE_PRICE_PREMIUM },
     }
 
     const planData = PLANS[plan]
