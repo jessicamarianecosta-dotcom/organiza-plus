@@ -208,6 +208,15 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
       appointment_type: selModality,
       appointment_price: apptPrice,
     })
+    if (error?.code === '23505') {
+      // Someone else booked this exact slot first (DB-level conflict guard)
+      setTaken(prev => [...prev, selTime])
+      setSelTime(null)
+      setBookError('Esse horário acabou de ser reservado por outra pessoa. Escolha outro horário.')
+      setStep('pick')
+      setSub(false)
+      return
+    }
     if (!error) {
       track(profile.id, 'booking_completed')
 

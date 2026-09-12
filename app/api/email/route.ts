@@ -80,6 +80,22 @@ async function logNotification(entry: {
   }
 }
 
+// ── HTML escaping ────────────────────────────────────────────────────────
+// This endpoint has no authentication (it must be callable by unauthenticated
+// clients booking a public appointment), so every field below can contain
+// attacker-controlled text. Escape it before interpolating into the email
+// HTML — otherwise a crafted client_name/notes/etc. could inject markup or
+// links into an email sent from the platform's real domain.
+function esc(v: unknown): string {
+  if (v === null || v === undefined) return ''
+  return String(v)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 // ── Templates ──────────────────────────────────────────────────────────────
 function wrap(content: string) {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -100,7 +116,7 @@ function wrap(content: string) {
 
 function card(rows: { label: string; value: string }[]) {
   return `<div style="background:#EAF3EC;border-radius:14px;padding:18px 20px;margin:16px 0">
-    ${rows.map(r => `<p style="margin:0 0 7px;color:#2C3530;font-size:14px"><strong>${r.label}</strong> ${r.value}</p>`).join('')}
+    ${rows.map(r => `<p style="margin:0 0 7px;color:#2C3530;font-size:14px"><strong>${r.label}</strong> ${esc(r.value)}</p>`).join('')}
   </div>`
 }
 
@@ -108,17 +124,17 @@ function locationBlock(d: { modality?: string; meeting_link?: string; clinic_nam
   if (d.modality === 'Online' && d.meeting_link) {
     return `<div style="background:#E8F0FE;border:1px solid #C5D8FF;border-radius:14px;padding:18px 20px;margin:16px 0">
       <p style="margin:0 0 10px;color:#1A3A6E;font-size:14px;font-weight:700">🔗 Link da reunião</p>
-      <a href="${d.meeting_link}" style="display:inline-block;background:#1A73E8;color:#ffffff;padding:11px 22px;border-radius:10px;font-size:14px;font-weight:700;text-decoration:none">Entrar na reunião →</a>
-      <p style="margin:10px 0 0;color:#4A6FA5;font-size:12px;word-break:break-all">${d.meeting_link}</p>
+      <a href="${esc(d.meeting_link)}" style="display:inline-block;background:#1A73E8;color:#ffffff;padding:11px 22px;border-radius:10px;font-size:14px;font-weight:700;text-decoration:none">Entrar na reunião →</a>
+      <p style="margin:10px 0 0;color:#4A6FA5;font-size:12px;word-break:break-all">${esc(d.meeting_link)}</p>
     </div>`
   }
   if (d.modality === 'Presencial') {
     const rows: string[] = []
-    if (d.clinic_name) rows.push(`<p style="margin:0 0 7px;color:#2C3530;font-size:14px"><strong>🏥 Local:</strong> ${d.clinic_name}</p>`)
-    if (d.clinic_address) rows.push(`<p style="margin:0 0 7px;color:#2C3530;font-size:14px"><strong>📍 Endereço:</strong> ${d.clinic_address}</p>`)
+    if (d.clinic_name) rows.push(`<p style="margin:0 0 7px;color:#2C3530;font-size:14px"><strong>🏥 Local:</strong> ${esc(d.clinic_name)}</p>`)
+    if (d.clinic_address) rows.push(`<p style="margin:0 0 7px;color:#2C3530;font-size:14px"><strong>📍 Endereço:</strong> ${esc(d.clinic_address)}</p>`)
     if (!rows.length) return ''
     const mapsBtn = d.clinic_maps_link
-      ? `<a href="${d.clinic_maps_link}" style="display:inline-block;margin-top:10px;background:#34A853;color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:700;text-decoration:none">Abrir no Google Maps →</a>`
+      ? `<a href="${esc(d.clinic_maps_link)}" style="display:inline-block;margin-top:10px;background:#34A853;color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:700;text-decoration:none">Abrir no Google Maps →</a>`
       : ''
     return `<div style="background:#F0F7F1;border:1px solid #C3DFC8;border-radius:14px;padding:18px 20px;margin:16px 0">
       <p style="margin:0 0 10px;color:#1D4A2A;font-size:14px;font-weight:700">📍 Local do atendimento</p>
@@ -135,7 +151,7 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
     subject: '📋 Agendamento recebido — aguardando confirmação',
     html: wrap(`
       <h2 style="color:#2C3530;margin:0 0 6px;font-size:21px">Solicitação recebida! 📋</h2>
-      <p style="color:#5A6660;margin:0 0 4px;font-size:15px">Olá, <strong>${d.client}</strong>!</p>
+      <p style="color:#5A6660;margin:0 0 4px;font-size:15px">Olá, <strong>${esc(d.client)}</strong>!</p>
       <p style="color:#5A6660;margin:0 0 16px;font-size:15px">Sua solicitação de agendamento foi recebida e está aguardando confirmação do profissional.</p>
       ${card([
         { label: '👨‍⚕️ Profissional:', value: d.professional },
@@ -156,8 +172,8 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
     subject: '✅ Consulta confirmada!',
     html: wrap(`
       <h2 style="color:#2C3530;margin:0 0 6px;font-size:21px">Consulta confirmada! ✅</h2>
-      <p style="color:#5A6660;margin:0 0 4px;font-size:15px">Olá, <strong>${d.client}</strong>!</p>
-      <p style="color:#5A6660;margin:0 0 16px;font-size:15px"><strong>${d.professional}</strong> confirmou sua consulta. Anote os detalhes:</p>
+      <p style="color:#5A6660;margin:0 0 4px;font-size:15px">Olá, <strong>${esc(d.client)}</strong>!</p>
+      <p style="color:#5A6660;margin:0 0 16px;font-size:15px"><strong>${esc(d.professional)}</strong> confirmou sua consulta. Anote os detalhes:</p>
       ${card([
         { label: '👨‍⚕️ Profissional:', value: d.professional },
         { label: '📅 Data:', value: d.date },
@@ -179,8 +195,8 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
     subject: '❌ Agendamento cancelado',
     html: wrap(`
       <h2 style="color:#2C3530;margin:0 0 6px;font-size:21px">Agendamento cancelado ❌</h2>
-      <p style="color:#5A6660;margin:0 0 4px;font-size:15px">Olá, <strong>${d.client}</strong>!</p>
-      <p style="color:#5A6660;margin:0 0 16px;font-size:15px">Infelizmente <strong>${d.professional}</strong> precisou cancelar o agendamento abaixo:</p>
+      <p style="color:#5A6660;margin:0 0 4px;font-size:15px">Olá, <strong>${esc(d.client)}</strong>!</p>
+      <p style="color:#5A6660;margin:0 0 16px;font-size:15px">Infelizmente <strong>${esc(d.professional)}</strong> precisou cancelar o agendamento abaixo:</p>
       ${card([
         { label: '📅 Data:', value: d.date },
         { label: '🕐 Horário:', value: d.time },
@@ -197,8 +213,8 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
     subject: '🔗 Link da consulta atualizado',
     html: wrap(`
       <h2 style="color:#2C3530;margin:0 0 6px;font-size:21px">Link da consulta atualizado 🔗</h2>
-      <p style="color:#5A6660;margin:0 0 4px;font-size:15px">Olá, <strong>${d.client}</strong>!</p>
-      <p style="color:#5A6660;margin:0 0 16px;font-size:15px"><strong>${d.professional}</strong> atualizou o link da sua consulta.</p>
+      <p style="color:#5A6660;margin:0 0 4px;font-size:15px">Olá, <strong>${esc(d.client)}</strong>!</p>
+      <p style="color:#5A6660;margin:0 0 16px;font-size:15px"><strong>${esc(d.professional)}</strong> atualizou o link da sua consulta.</p>
       ${card([
         { label: '📅 Data:', value: d.date },
         { label: '🕐 Horário:', value: d.time },
@@ -237,7 +253,7 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
     subject: '🔔 Lembrete: consulta amanhã',
     html: wrap(`
       <h2 style="color:#2C3530;margin:0 0 6px;font-size:21px">Lembrete de consulta 🔔</h2>
-      <p style="color:#5A6660;margin:0 0 16px;font-size:15px">Olá, <strong>${d.client}</strong>! Sua consulta é amanhã.</p>
+      <p style="color:#5A6660;margin:0 0 16px;font-size:15px">Olá, <strong>${esc(d.client)}</strong>! Sua consulta é amanhã.</p>
       ${card([
         { label: '👨‍⚕️ Profissional:', value: d.professional },
         { label: '📅 Data:', value: d.date },
@@ -252,7 +268,7 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
     subject: '🌿 Bem-vindo ao Organiza+',
     html: wrap(`
       <h2 style="color:#2C3530;margin:0 0 6px;font-size:21px">Bem-vindo ao Organiza+! 🌿</h2>
-      <p style="color:#5A6660;margin:0 0 16px;font-size:15px">Olá, <strong>${d.name}</strong>! Sua conta foi criada com sucesso.</p>
+      <p style="color:#5A6660;margin:0 0 16px;font-size:15px">Olá, <strong>${esc(d.name)}</strong>! Sua conta foi criada com sucesso.</p>
       <div style="background:#EAF3EC;border-radius:14px;padding:18px 20px;margin:16px 0">
         <p style="margin:0 0 10px;color:#2C3530;font-size:14px;font-weight:700">Próximos passos:</p>
         <p style="margin:0 0 7px;color:#2C3530;font-size:14px">✅ Complete seu perfil</p>

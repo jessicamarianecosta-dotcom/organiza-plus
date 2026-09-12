@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://organizaplusapp.com.br'
 
@@ -13,8 +15,23 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // Never trust a client-supplied userId — a checkout paid for by anyone
+    // must only ever activate the plan of the person actually authenticated
+    // in this request, or an attacker could upgrade someone else's account
+    // (or attribute their own payment to the wrong account).
+    const cookieStore = await cookies()
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
+    )
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
+
     const stripe = new Stripe(key)
-    const { plan, userId, email } = await req.json()
+    const { plan } = await req.json()
+    const userId = user.id
+    const email = user.email
 
     const PLANS: Record<string, { name: string; amount: number; priceId?: string }> = {
       basic:   { name: '🌿 Organiza+ Basic',   amount: 2700, priceId: process.env.STRIPE_PRICE_BASIC },
