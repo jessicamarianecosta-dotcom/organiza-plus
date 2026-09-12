@@ -209,7 +209,7 @@ export default function AgendaPage() {
     <div style={{ minHeight:'100vh', background:T.off, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:T.fontSans }}>
       <GlobalStyles/><div style={{ textAlign:'center' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.svg" alt="Organiza+" style={{ height:52, width:'auto', marginBottom:12 }}/>
+        <img src="/brand/logo-square-dark.png" alt="Organiza+" style={{ height:52, width:'auto', marginBottom:12 }}/>
         <div style={{ width:28,height:28,border:`3px solid ${T.sageP}`,borderTopColor:T.sage,borderRadius:'50%',animation:'spin 0.8s linear infinite',margin:'0 auto' }}/>
       </div>
     </div>
@@ -239,7 +239,7 @@ export default function AgendaPage() {
           </Link>
           <span style={{ color:T.nude }}>|</span>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt="Organiza+" style={{ height:32, width:'auto' }}/>
+          <img src="/brand/logo-wide-dark.png" alt="Organiza+" style={{ height:32, width:'auto' }}/>
           <span style={{ fontSize:14, fontWeight:600, color:T.dark }}>· Agenda & Workspace</span>
           <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>
             {urgentRem.length>0 && <span style={{ background:'#fef2f2', color:'#e05252', border:'1px solid #fecaca', fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:T.r100, display:'flex', alignItems:'center', gap:4 }}><Bell size={11}/>{urgentRem.length} urgente{urgentRem.length>1?'s':''}</span>}

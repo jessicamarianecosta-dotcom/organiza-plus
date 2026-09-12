@@ -238,10 +238,10 @@ export function H3({ children, style }: { children: React.ReactNode, style?: CSS
 }
 
 // ─── LOGO ────────────────────────────────────────────────────────────────────
-export function Logo({ size=20 }: { size?: number }) {
+export function Logo({ size=20, variant='dark' }: { size?: number, variant?: 'dark'|'light' }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src="/logo.svg" alt="Organiza+" style={{ height:size*2.2, width:'auto', display:'block' }}/>
+    <img src={variant==='light' ? '/brand/logo-square-light.png' : '/brand/logo-square-dark.png'} alt="Organiza+" style={{ height:size*2.2, width:'auto', display:'block' }}/>
   )
 }
 

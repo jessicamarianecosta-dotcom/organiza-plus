@@ -234,7 +234,7 @@ function DashboardContent() {
       <GlobalStyles/>
       <div style={{ textAlign:'center' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.svg" alt="Organiza+" style={{ height:60, width:'auto', marginBottom:12 }}/>
+        <img src="/brand/logo-square-dark.png" alt="Organiza+" style={{ height:60, width:'auto', marginBottom:12 }}/>
         <div style={{ width:32, height:32, border:`3px solid ${T.sageP}`, borderTopColor:T.sage, borderRadius:'50%', animation:'spin 0.8s linear infinite', margin:'0 auto' }}/>
       </div>
     </div>
@@ -430,9 +430,9 @@ function DashboardContent() {
       }} className="sidebar">
         <style>{`.sidebar { @media(max-width:767px){ transform: ${sidebarOpen?'translateX(0)':'translateX(-224px)'}; } }`}</style>
         {/* Logo */}
-        <div style={{ padding:'22px 20px 18px', borderBottom:'1px solid rgba(255,255,255,0.08)', marginBottom:8 }}>
+        <div style={{ padding:'26px 20px 22px', borderBottom:'1px solid rgba(255,255,255,0.08)', marginBottom:8, display:'flex', justifyContent:'center' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt="Organiza+" style={{ height:36, width:'auto' }}/>
+          <img src="/brand/logo-square-light.png" alt="Organiza+" style={{ height:112, width:'auto', maxWidth:'100%' }}/>
         </div>
 
         {/* Nav items */}
@@ -493,7 +493,7 @@ function DashboardContent() {
           <Menu size={22}/>
         </button>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.svg" alt="Organiza+" style={{ height:32, width:'auto' }}/>
+        <img src="/brand/logo-square-light.png" alt="Organiza+" style={{ height:32, width:'auto' }}/>
         {profile && <Link href={`/p/${profile.slug}`} target="_blank" style={{ color:'rgba(255,255,255,0.4)', display:'flex' }}><Globe size={18}/></Link>}
       </header>
 

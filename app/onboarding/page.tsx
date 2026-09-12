@@ -246,7 +246,7 @@ export default function Onboarding() {
           {/* Logo + step counter */}
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.svg" alt="Organiza+" style={{ height:38, width:'auto' }}/>
+            <img src="/brand/logo-wide-dark.png" alt="Organiza+" style={{ height:38, width:'auto' }}/>
             <span style={{ fontSize:13, color:T.muted, fontWeight:600 }}>Passo {step} de {STEPS.length}</span>
           </div>
 
