@@ -11,6 +11,7 @@ const PROFESSIONS = [
 ]
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 type FIProps = {
   label: string
@@ -112,7 +113,16 @@ function CadastroForm() {
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/signup`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          // The Supabase Edge Functions gateway rejects requests missing
+          // this header before they reach the function — even when the
+          // function itself has verify_jwt disabled — and that rejection
+          // comes back without CORS headers, which the browser surfaces as
+          // an opaque "Failed to fetch" instead of a real error status.
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        },
         body: JSON.stringify(payload),
       })
 
