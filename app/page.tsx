@@ -1,8 +1,9 @@
 'use client'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Check, Star, Menu, X, Zap, Shield } from 'lucide-react'
+import { ArrowRight, Check, Star, Menu, X, Zap, Shield, Monitor, Smartphone } from 'lucide-react'
 import { T, GlobalStyles } from '@/lib/ds'
+import { InstallPwaButton } from './install-pwa-button'
 
 export default function Home() {
   const [scrolled, setScrolled]   = useState(false)
@@ -340,11 +341,11 @@ export default function Home() {
           </p>
           <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2,1fr)', gap:20, maxWidth:720, margin:'0 auto' }}>
             <PlanCard
-              name="🌿 Basic" price="27"
+              name="🌿 Basic" price="17"
               features={['Página profissional','Link personalizado','Agendamento online','Integração WhatsApp','Responsivo mobile']}
               cta="Começar Basic" href="/cadastro?plano=basic" featured={false}/>
             <PlanCard
-              name="💎 Premium" price="47"
+              name="💎 Premium" price="37"
               features={['Tudo do Basic','Painel administrativo','Gestão de horários','8 temas de cores','Upload de fotos','Analytics completo','SEO básico incluso']}
               cta="Começar Premium →" href="/cadastro?plano=premium" featured={true} badge="Mais popular"/>
           </div>
@@ -367,6 +368,22 @@ export default function Home() {
               <BenefitCard key={t.t} {...t}/>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════ APP INSTALÁVEL ══════════════════════════ */}
+      <section style={{ padding: isMobile ? '56px 20px' : '80px 24px', background:`linear-gradient(140deg, ${T.sageG} 0%, ${T.begeP} 100%)` }}>
+        <div style={{ maxWidth:720, margin:'0 auto', textAlign:'center' }}>
+          <div style={{ display:'inline-flex', alignItems:'center', gap:8, marginBottom:18, color:T.sage }}>
+            <Monitor size={20}/><Smartphone size={20}/>
+          </div>
+          <h2 style={{ fontFamily:T.fontSerif, fontSize: isMobile ? 26 : 'clamp(26px,3.4vw,38px)', color:T.dark, marginBottom:14, lineHeight:1.15 }}>
+            Tenha o Organiza+ também como <em style={{ color:T.sage, fontStyle:'italic' }}>aplicativo.</em>
+          </h2>
+          <p style={{ fontSize: isMobile ? 15 : 16, color:T.mid, maxWidth:460, margin:'0 auto 28px', lineHeight:1.6 }}>
+            Instale no seu computador ou celular e acesse sua rotina de forma rápida e prática, direto da tela inicial.
+          </p>
+          <InstallPwaButton/>
         </div>
       </section>
 

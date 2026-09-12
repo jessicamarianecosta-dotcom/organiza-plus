@@ -55,8 +55,8 @@ export default function Planos() {
     if (url) { window.location.href = url } else { alert('Stripe não configurado ainda. ' + (error||'')); setLoading(null) }
   }
 
-  const basicPrice  = annual ? 22 : 27
-  const premiumPrice = annual ? 38 : 47
+  const basicPrice  = annual ? 14 : 17
+  const premiumPrice = annual ? 30 : 37
 
   if (!mounted) return <div style={{ minHeight:'100vh', background:T.off }}><GlobalStyles/></div>
 
