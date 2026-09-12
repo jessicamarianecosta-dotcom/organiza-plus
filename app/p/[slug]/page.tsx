@@ -245,7 +245,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
       <GlobalStyles/>
       <div style={{ textAlign:'center' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.svg" alt="Organiza+" style={{ height:52, width:'auto', marginBottom:14 }}/>
+        <img src="/brand/logo-square-dark.png" alt="Organiza+" style={{ height:52, width:'auto', marginBottom:14 }}/>
         <div style={{ width:28, height:28, border:`3px solid ${T.sageP}`, borderTopColor:T.sage, borderRadius:'50%', animation:'spin 0.7s linear infinite', margin:'0 auto' }}/>
       </div>
     </div>
@@ -315,7 +315,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
         transition:'all 0.3s ease',
       }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.svg" alt="Organiza+" style={{ height:'clamp(26px,5vw,32px)', width:'auto' }}/>
+        <img src={scrolled ? '/brand/logo-square-dark.png' : '/brand/logo-square-light.png'} alt="Organiza+" style={{ height:'clamp(26px,5vw,32px)', width:'auto', transition:'opacity 0.3s' }}/>
         <button onClick={scrollToBook} className="nav-cta"
           style={{ background:th.primary, color:'#FAFAF7', borderRadius:T.r100, fontWeight:700, border:'none', cursor:'pointer', fontFamily:T.fontSans, boxShadow:`0 4px 14px ${th.primary}44`, transition:'all 0.2s', whiteSpace:'nowrap' }}
           onMouseEnter={e=>{e.currentTarget.style.background=th.mid;e.currentTarget.style.transform='translateY(-1px)'}}
@@ -849,7 +849,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
             <p style={{ fontSize:12, color:'rgba(255,255,255,0.2)', margin:0, display:'flex', alignItems:'center', gap:6 }}>
               Powered by
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.svg" alt="Organiza+" style={{ height:16, width:'auto', verticalAlign:'middle' }}/>
+              <img src="/brand/logo-square-light.png" alt="Organiza+" style={{ height:16, width:'auto', verticalAlign:'middle' }}/>
             </p>
           </div>
         </div>

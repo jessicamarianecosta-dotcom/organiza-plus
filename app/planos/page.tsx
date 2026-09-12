@@ -73,7 +73,7 @@ export default function Planos() {
           </Link>
           <span style={{ color:T.nude }}>|</span>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt="Organiza+" style={{ height:32, width:'auto' }}/>
+          <img src="/brand/logo-wide-dark.png" alt="Organiza+" style={{ height:32, width:'auto' }}/>
         </div>
       </div>
 

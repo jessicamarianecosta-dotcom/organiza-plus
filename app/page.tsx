@@ -48,7 +48,7 @@ export default function Home() {
         {/* Logo */}
         <Link href="/" style={{ display:'flex', alignItems:'center', textDecoration:'none', flexShrink:0 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt="Organiza+" style={{ height:42, width:'auto' }}/>
+          <img src="/brand/logo-wide-dark.png" alt="Organiza+" style={{ height:42, width:'auto' }}/>
         </Link>
 
         {/* Desktop nav */}
@@ -177,7 +177,7 @@ export default function Home() {
                 <div style={{ width:200, background:T.dark, padding:'18px 0', display:'flex', flexDirection:'column', gap:2, flexShrink:0 }}>
                   <div style={{ padding:'0 18px 16px', borderBottom:'1px solid rgba(255,255,255,0.08)', marginBottom:6 }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/logo.svg" alt="Organiza+" style={{ height:30, width:'auto' }}/>
+                    <img src="/brand/logo-square-light.png" alt="Organiza+" style={{ height:30, width:'auto' }}/>
                   </div>
                   {[['📊','Dashboard',true],['📅','Agenda',false],['👥','Clientes',false],['🌐','Minha página',false]].map(([ic,lb,ac])=>(
                     <div key={lb as string} style={{ display:'flex', alignItems:'center', gap:9, margin:'2px 10px', padding:'8px 12px', borderRadius:10, fontSize:13, fontWeight:500, background:ac?'rgba(122,158,135,0.18)':'transparent', color:ac?T.sageL:'rgba(255,255,255,0.32)' }}>{ic} {lb}</div>
@@ -388,7 +388,7 @@ export default function Home() {
       {/* ══════════════════════════ FOOTER ══════════════════════════ */}
       <footer style={{ background:T.dark, borderTop:'1px solid rgba(255,255,255,0.06)', padding: isMobile ? '28px 20px' : '36px 24px', textAlign:'center' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.svg" alt="Organiza+" style={{ height:34, width:'auto', opacity:0.35, margin:'0 auto 6px', display:'block' }}/>
+        <img src="/brand/logo-wide-light.png" alt="Organiza+" style={{ height:34, width:'auto', opacity:0.35, margin:'0 auto 6px', display:'block' }}/>
         <p style={{ fontSize:12, color:'rgba(255,255,255,0.18)', margin:'0 0 12px' }}>© 2026 Organiza+. Feito com 💚 para profissionais modernos.</p>
         <div style={{ display:'flex', gap:16, justifyContent:'center' }}>
           <Link href="/termos" style={{ fontSize:12, color:'rgba(255,255,255,0.3)', textDecoration:'none' }}>Termos de Uso</Link>

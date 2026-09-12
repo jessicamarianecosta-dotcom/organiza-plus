@@ -32,7 +32,7 @@ export default function RecuperarSenha() {
         <div style={{ background:C.white, borderRadius:24, padding:'36px', boxShadow:'0 8px 40px rgba(44,53,48,0.10), 0 0 0 1px rgba(237,232,224,0.6)' }}>
           <div style={{ marginBottom:24 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.svg" alt="Organiza+" style={{ height:44, width:'auto' }}/>
+            <img src="/brand/logo-square-dark.png" alt="Organiza+" style={{ height:44, width:'auto' }}/>
           </div>
           {done ? (
             <div style={{ textAlign:'center', padding:'20px 0' }}>

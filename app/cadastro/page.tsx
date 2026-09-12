@@ -186,7 +186,7 @@ function CadastroForm() {
       <GlobalStyles/>
       <div style={{ textAlign:'center' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.svg" alt="Organiza+" style={{ height:48, width:'auto', marginBottom:12 }}/>
+        <img src="/brand/logo-square-dark.png" alt="Organiza+" style={{ height:48, width:'auto', marginBottom:12 }}/>
         <div style={{ width:24, height:24, border:`3px solid ${T.sageP}`, borderTopColor:T.sage, borderRadius:'50%', animation:'spin 0.7s linear infinite', margin:'0 auto' }}/>
       </div>
     </div>
@@ -218,7 +218,7 @@ function CadastroForm() {
           {/* Logo */}
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:22 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.svg" alt="Organiza+" style={{ height:44, width:'auto' }}/>
+            <img src="/brand/logo-square-dark.png" alt="Organiza+" style={{ height:44, width:'auto' }}/>
             <span style={{ background:T.sageG, color:T.sage, fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:T.r100, border:`1px solid ${T.sageP}` }}>
               {plano==='premium'?'💎 Premium':'🌿 Basic'}
             </span>
@@ -330,7 +330,7 @@ export default function Cadastro() {
     <Suspense fallback={
       <div style={{ minHeight:'100vh', background:'#F7F5F0', display:'flex', alignItems:'center', justifyContent:'center' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.svg" alt="Organiza+" style={{ height:44, width:'auto' }}/>
+        <img src="/brand/logo-square-dark.png" alt="Organiza+" style={{ height:44, width:'auto' }}/>
       </div>
     }>
       <CadastroForm/>

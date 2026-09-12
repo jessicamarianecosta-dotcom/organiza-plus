@@ -67,7 +67,7 @@ export default function Analytics() {
       <GlobalStyles/>
       <div style={{ textAlign:'center' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.svg" alt="Organiza+" style={{ height:52, width:'auto', marginBottom:12 }}/>
+        <img src="/brand/logo-square-dark.png" alt="Organiza+" style={{ height:52, width:'auto', marginBottom:12 }}/>
         <div style={{ width:28, height:28, border:`3px solid ${T.sageP}`, borderTopColor:T.sage, borderRadius:'50%', animation:'spin 0.8s linear infinite', margin:'0 auto' }}/>
       </div>
     </div>
@@ -89,7 +89,7 @@ export default function Analytics() {
           </Link>
           <span style={{ color:T.nude, userSelect:'none' }}>|</span>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt="Organiza+" style={{ height:32, width:'auto' }}/>
+          <img src="/brand/logo-wide-dark.png" alt="Organiza+" style={{ height:32, width:'auto' }}/>
           <span style={{ marginLeft:'auto', fontSize:13, color:T.muted }}>Analytics · {profileName}</span>
         </div>
       </div>
