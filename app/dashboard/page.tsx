@@ -70,7 +70,7 @@ function DashboardContent() {
       if (!user) { router.push('/login'); return }
       const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
       if (!p) { router.push('/onboarding'); return }
-      if (!(p as any).onboarding_done) { router.push('/onboarding'); return }
+      if (!p.onboarding_done) { router.push('/onboarding'); return }
       setProfile(p)
       const [{ data: a }, { count: schedCount }] = await Promise.all([
         supabase.from('appointments').select('*').eq('professional_id', user.id).order('appt_date',{ascending:true}).order('appt_time',{ascending:true}).limit(100),

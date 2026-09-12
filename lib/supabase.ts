@@ -29,6 +29,9 @@ export type Profile = {
   clinic_name: string | null
   clinic_address: string | null
   clinic_maps_link: string | null
+  theme_color: string | null
+  onboarding_done: boolean
+  email: string | null
   created_at: string
 }
 

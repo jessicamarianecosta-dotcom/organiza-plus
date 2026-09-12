@@ -125,7 +125,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
     supabase.from('profiles').select('*').eq('slug', slug).single().then(({ data: p }) => {
       if (!p) { setNotFound(true); setLoading(false); return }
       setProfile(p)
-      const tc = (p as any).theme_color
+      const tc = p.theme_color
       if (tc && THEMES[tc]) setTh(THEMES[tc])
       setTmpl(getTemplate(p.profession || ''))
       supabase.from('availability').select('*').eq('professional_id', p.id).eq('active', true).then(({ data }) => setAvail(data||[]))
@@ -221,9 +221,9 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
       track(profile.id, 'booking_completed')
 
       // Notify professional via email about new booking
-      if ((profile as any).email) {
+      if (profile.email) {
         fetch('/api/email', { method:'POST', headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({ type:'new_booking', to:(profile as any).email, client:clientName, phone:clientPhone, date:selDate, time:selTime, notes:notes||undefined, modality:modalityLabel, price:fmtPrice }) })
+          body:JSON.stringify({ type:'new_booking', to:profile.email, client:clientName, phone:clientPhone, date:selDate, time:selTime, notes:notes||undefined, modality:modalityLabel, price:fmtPrice }) })
       }
 
       // Notify client that booking was received (awaiting confirmation — NOT confirmed yet)
@@ -836,9 +836,9 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
                     <WppIcon size={14}/> WhatsApp
                   </a>
                 )}
-                {(profile as any).instagram && (
-                  <a href={`https://instagram.com/${(profile as any).instagram.replace('@','')}`} target="_blank" rel="noopener" style={{ display:'flex', alignItems:'center', gap:8, color:'rgba(255,255,255,0.45)', fontSize:13, textDecoration:'none' }}>
-                    📷 {(profile as any).instagram}
+                {profile.instagram && (
+                  <a href={`https://instagram.com/${profile.instagram.replace('@','')}`} target="_blank" rel="noopener" style={{ display:'flex', alignItems:'center', gap:8, color:'rgba(255,255,255,0.45)', fontSize:13, textDecoration:'none' }}>
+                    📷 {profile.instagram}
                   </a>
                 )}
               </div>

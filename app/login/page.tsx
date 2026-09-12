@@ -6,7 +6,9 @@ import { supabase } from '@/lib/supabase'
 
 const C = { sage:'#7A9E87', sageG:'#EAF3EC', sageP:'#D6E8DA', dark:'#2C3530', mid:'#5A6660', muted:'#8A9690', cream:'#FAFAF7', off:'#F7F5F0', nude:'#EDE8E0', white:'#FFFFFF', red:'#ef4444', redL:'#fef2f2', redB:'#fecaca' }
 
-async function redirectAfterAuth(userId: string, router: any) {
+type Router = ReturnType<typeof useRouter>
+
+async function redirectAfterAuth(userId: string, router: Router) {
   // Check if profile exists and onboarding is done
   const { data: profile } = await supabase
     .from('profiles')
@@ -129,7 +131,8 @@ export default function Login() {
 }
 
 // Shared micro-components
-function FocusInput({ label, type='text', value, set, placeholder, auto }: any) {
+type FocusInputProps = { label: string; type?: string; value: string; set: (v: string) => void; placeholder?: string; auto?: string }
+function FocusInput({ label, type='text', value, set, placeholder, auto }: FocusInputProps) {
   const [f, setF] = useState(false)
   return (
     <div style={{ marginBottom:16 }}>
@@ -140,7 +143,8 @@ function FocusInput({ label, type='text', value, set, placeholder, auto }: any) 
     </div>
   )
 }
-function FocusInputRaw({ type, value, set, placeholder, auto, pr=16 }: any) {
+type FocusInputRawProps = { type: string; value: string; set: (v: string) => void; placeholder?: string; auto?: string; pr?: number }
+function FocusInputRaw({ type, value, set, placeholder, auto, pr=16 }: FocusInputRawProps) {
   const [f, setF] = useState(false)
   return (
     <input type={type} value={value} onChange={e=>set(e.target.value)} placeholder={placeholder} autoComplete={auto} required
@@ -148,7 +152,7 @@ function FocusInputRaw({ type, value, set, placeholder, auto, pr=16 }: any) {
       onFocus={()=>setF(true)} onBlur={()=>setF(false)}/>
   )
 }
-function Btn({ children, loading, disabled }: any) {
+function Btn({ children, loading, disabled }: { children: React.ReactNode; loading?: boolean; disabled?: boolean }) {
   const [h, setH] = useState(false)
   return (
     <button type="submit" disabled={disabled||loading}

@@ -1,12 +1,12 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { T, GlobalStyles } from '@/lib/ds'
 import DynamicSpecialties from '@/lib/DynamicSpecialties'
 import ScheduleConfig, { defaultWeek, weekConfigToRows, WeekConfig, BlockedSlot } from '@/lib/ScheduleConfig'
 import PhotoCropper from '@/lib/PhotoCropper'
-import { Clock, Globe, Sparkles, ArrowRight, Check, ChevronRight } from 'lucide-react'
+import { Globe, Sparkles, ArrowRight, ChevronRight } from 'lucide-react'
 
 // ─── DATA ──────────────────────────────────────────────────────────────────
 const PROFESSIONS = [
@@ -29,8 +29,6 @@ const THEMES = [
   { id:'slate',      name:'Ardósia',       desc:'Profissionalismo',     primary:'#607B8B', dark:'#1E2E38', glow:'#EBF1F5', pale:'#C8D8E0', light:'#8FA5B3' },
 ]
 
-const DAYS = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
-
 const STEPS = [
   { n:1, icon:'🎯', label:'Profissão' },
   { n:2, icon:'🎨', label:'Visual' },
@@ -45,7 +43,16 @@ function slugify(s: string) {
 }
 
 // ─── MICRO COMPONENTS ──────────────────────────────────────────────────────
-function FI({ label, value, set, placeholder, req=false, type='text', maxLen }: any) {
+type FIProps = {
+  label?: string
+  value: string
+  set: (v: string) => void
+  placeholder?: string
+  req?: boolean
+  type?: string
+  maxLen?: number
+}
+function FI({ label, value, set, placeholder, req=false, type='text', maxLen }: FIProps) {
   const [f, setF] = useState(false)
   return (
     <div style={{ marginBottom:14 }}>
@@ -57,7 +64,8 @@ function FI({ label, value, set, placeholder, req=false, type='text', maxLen }: 
   )
 }
 
-function FTA({ label, value, set, placeholder, rows=4 }: any) {
+type FTAProps = { label?: string; value: string; set: (v: string) => void; placeholder?: string; rows?: number }
+function FTA({ label, value, set, placeholder, rows=4 }: FTAProps) {
   const [f, setF] = useState(false)
   return (
     <div style={{ marginBottom:14 }}>
@@ -69,7 +77,14 @@ function FTA({ label, value, set, placeholder, rows=4 }: any) {
   )
 }
 
-function PrimaryBtn({ children, onClick, disabled, loading, style }: any) {
+type PrimaryBtnProps = {
+  children: React.ReactNode
+  onClick?: () => void
+  disabled?: boolean
+  loading?: boolean
+  style?: React.CSSProperties
+}
+function PrimaryBtn({ children, onClick, disabled, loading, style }: PrimaryBtnProps) {
   const [h, setH] = useState(false)
   return (
     <button type={onClick?'button':'submit'} onClick={onClick} disabled={disabled||loading}
@@ -81,7 +96,7 @@ function PrimaryBtn({ children, onClick, disabled, loading, style }: any) {
   )
 }
 
-function SecBtn({ children, onClick }: any) {
+function SecBtn({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
   const [h, setH] = useState(false)
   return (
     <button type="button" onClick={onClick}
@@ -134,16 +149,16 @@ export default function Onboarding() {
         if (!user) { void router.push('/login'); return }
         const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
         if (!p) { void router.push('/cadastro'); return }
-        if ((p as any).onboarding_done) { void router.push('/dashboard'); return }
-        setPid(p.id); setSlug((p as any).slug || '')
+        if (p.onboarding_done) { void router.push('/dashboard'); return }
+        setPid(p.id); setSlug(p.slug || '')
         setName(p.name || ''); setBio(p.bio || '')
         setWhatsapp(p.whatsapp || ''); setCity(p.city || '')
         setState(p.state || ''); setCrm(p.crm_cro_crp || '')
-        setInstagram((p as any).instagram || ''); setPhotoUrl(p.photo_url || '')
+        setInstagram(p.instagram || ''); setPhotoUrl(p.photo_url || '')
         setProfession(p.profession || ''); setSpecs(p.specialties || [])
-        const saved = THEMES.find(t => t.id === (p as any).theme_color)
+        const saved = THEMES.find(t => t.id === p.theme_color)
         if (saved) setTheme(saved)
-      } catch (_e) {
+      } catch {
         void router.push('/login')
       }
     })()
@@ -168,7 +183,7 @@ export default function Onboarding() {
 
   async function saveStep2() {
     setSaving(true)
-    await supabase.from('profiles').update({ theme_color: theme.id } as any).eq('id', pid)
+    await supabase.from('profiles').update({ theme_color: theme.id }).eq('id', pid)
     setSaving(false); setStep(3)
   }
 
@@ -210,7 +225,7 @@ export default function Onboarding() {
 
   async function finish() {
     setSaving(true)
-    await supabase.from('profiles').update({ onboarding_done: true } as any).eq('id', pid)
+    await supabase.from('profiles').update({ onboarding_done: true }).eq('id', pid)
     setSaving(false); setStep(6)
   }
 

@@ -12,7 +12,18 @@ const PROFESSIONS = [
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 
-function FI({ label, type='text', value, set, placeholder, auto, err, hint, autoFocus }: any) {
+type FIProps = {
+  label: string
+  type?: string
+  value: string
+  set: (v: string) => void
+  placeholder?: string
+  auto?: string
+  err?: string
+  hint?: string
+  autoFocus?: boolean
+}
+function FI({ label, type='text', value, set, placeholder, auto, err, hint, autoFocus }: FIProps) {
   const [f, setF] = useState(false)
   return (
     <div style={{ marginBottom:14 }}>
@@ -58,7 +69,7 @@ function CadastroForm() {
         if (!user) { setChecking(false); return }
         const { data: p } = await supabase.from('profiles').select('onboarding_done').eq('id', user.id).single()
         void router.push(p?.onboarding_done ? '/dashboard' : '/onboarding')
-      } catch (_e) {
+      } catch {
         setChecking(false)
       }
     })()
@@ -104,7 +115,7 @@ function CadastroForm() {
 
       console.log('[Cadastro] HTTP status:', res.status, res.statusText)
 
-      let data: any = {}
+      let data: { error?: string; session?: { access_token: string; refresh_token: string } } = {}
       try {
         data = await res.json()
         console.log('[Cadastro] Resposta da Edge Function:', data)
@@ -149,9 +160,9 @@ function CadastroForm() {
       console.log('[Cadastro] Sucesso! Redirecionando para /onboarding')
       router.push('/onboarding')
 
-    } catch (err: any) {
+    } catch (err) {
       console.error('[Cadastro] Erro de rede/inesperado:', err)
-      const detail = err?.message || String(err)
+      const detail = err instanceof Error ? err.message : String(err)
       setError(`Erro de conexão: ${detail}`)
       setLoading(false)
     }
