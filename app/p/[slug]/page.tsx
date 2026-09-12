@@ -315,7 +315,7 @@ export default function PublicProfile({ params }: { params: Promise<{slug:string
         transition:'all 0.3s ease',
       }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={scrolled ? '/brand/logo-square-dark.png' : '/brand/logo-square-light.png'} alt="Organiza+" style={{ height:'clamp(26px,5vw,32px)', width:'auto', transition:'opacity 0.3s' }}/>
+        <img src={scrolled ? '/brand/logo-wide-dark.png' : '/brand/logo-wide-light.png'} alt="Organiza+" style={{ width:'clamp(100px,26vw,160px)', height:'auto', transition:'opacity 0.3s' }}/>
         <button onClick={scrollToBook} className="nav-cta"
           style={{ background:th.primary, color:'#FAFAF7', borderRadius:T.r100, fontWeight:700, border:'none', cursor:'pointer', fontFamily:T.fontSans, boxShadow:`0 4px 14px ${th.primary}44`, transition:'all 0.2s', whiteSpace:'nowrap' }}
           onMouseEnter={e=>{e.currentTarget.style.background=th.mid;e.currentTarget.style.transform='translateY(-1px)'}}
