@@ -6,7 +6,7 @@ import { T, GlobalStyles } from '@/lib/ds'
 import DynamicSpecialties from '@/lib/DynamicSpecialties'
 import ScheduleConfig, { defaultWeek, weekConfigToRows, WeekConfig, BlockedSlot } from '@/lib/ScheduleConfig'
 import PhotoCropper from '@/lib/PhotoCropper'
-import { Globe, Sparkles, ArrowRight, ChevronRight } from 'lucide-react'
+import { Globe, Sparkles, ArrowRight, ArrowLeft, ChevronRight } from 'lucide-react'
 
 // ─── DATA ──────────────────────────────────────────────────────────────────
 const PROFESSIONS = [
@@ -243,6 +243,15 @@ export default function Onboarding() {
       {/* ── TOP BAR ── */}
       <div style={{ position:'sticky', top:0, zIndex:50, background:`rgba(247,245,240,0.92)`, backdropFilter:'blur(16px)', borderBottom:`1px solid ${T.nude}`, padding:'0 24px' }}>
         <div style={{ maxWidth:680, margin:'0 auto', padding:'14px 0' }}>
+          {/* Back to cadastro — only on step 1, where there's no previous onboarding step to return to */}
+          {step===1 && (
+            <button type="button" onClick={()=>router.push('/cadastro?voltar=1')} aria-label="Voltar para o cadastro"
+              style={{ display:'flex', alignItems:'center', gap:5, background:'none', border:'none', padding:'2px 0', marginBottom:8, cursor:'pointer', color:T.muted, fontSize:13, fontWeight:600, fontFamily:T.fontSans, transition:'color 0.15s' }}
+              onMouseEnter={e=>{e.currentTarget.style.color=T.dark}} onMouseLeave={e=>{e.currentTarget.style.color=T.muted}}>
+              <ArrowLeft size={15}/> Voltar
+            </button>
+          )}
+
           {/* Logo + step counter */}
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}

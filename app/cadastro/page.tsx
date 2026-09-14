@@ -43,6 +43,7 @@ function CadastroForm() {
   const router  = useRouter()
   const params  = useSearchParams()
   const plano   = params.get('plano') || 'basic'
+  const voltar  = params.get('voltar') === '1'
 
   const [mounted,  setMounted]  = useState(false)
   const [checking, setChecking] = useState(true)
@@ -50,6 +51,10 @@ function CadastroForm() {
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
   const [showPw,   setShowPw]   = useState(false)
+  // Set when we arrived here via the onboarding "Voltar" button for an
+  // account that already exists — submitting must update the existing
+  // profile instead of calling the signup function again.
+  const [editingProfileId, setEditingProfileId] = useState('')
 
   const [name,     setName]     = useState('')
   const [email,    setEmail]    = useState('')
@@ -69,9 +74,25 @@ function CadastroForm() {
         const { user } = await getUserSafe()
         if (!user) { setChecking(false); return }
         const { data: p } = await withTimeout(
-          supabase.from('profiles').select('onboarding_done').eq('id', user.id).single()
+          supabase.from('profiles').select('onboarding_done, name, profession').eq('id', user.id).single()
         )
         if (!p) { setChecking(false); return }
+        if (voltar && !p.onboarding_done) {
+          // Coming back from onboarding step 1: account already exists, so
+          // don't bounce forward again — show the profession step prefilled
+          // instead, with terms already accepted at signup.
+          setEditingProfileId(user.id)
+          setName(p.name || '')
+          if (p.profession && !PROFESSIONS.includes(p.profession)) {
+            setProfession('Outro'); setCustomProf(p.profession)
+          } else {
+            setProfession(p.profession || '')
+          }
+          setAcceptedTerms(true)
+          setStep(2)
+          setChecking(false)
+          return
+        }
         void router.push(p.onboarding_done ? '/dashboard' : '/onboarding')
       } catch {
         setChecking(false)
@@ -99,6 +120,16 @@ function CadastroForm() {
     const finalProf = profession === 'Outro' ? (customProf.trim() || 'Outro') : profession
     if (!finalProf) { setError('Selecione ou informe sua profissão.'); return }
     setError(''); setLoading(true)
+
+    if (editingProfileId) {
+      // Account already exists (we got here via the onboarding back button):
+      // update the profile in place, never call signup again.
+      const { error: updErr } = await supabase.from('profiles').update({ profession: finalProf }).eq('id', editingProfileId)
+      setLoading(false)
+      if (updErr) { setError(`Erro ao salvar: ${updErr.message}`); return }
+      router.push('/onboarding')
+      return
+    }
 
     const payload = {
       email: email.trim(),
@@ -296,17 +327,19 @@ function CadastroForm() {
               </label>
 
               <div style={{ display:'flex', gap:10, marginTop:4 }}>
-                <button type="button" onClick={()=>{setStep(1);setError('')}}
-                  style={{ padding:'14px 20px', border:`2px solid ${T.nude}`, background:'transparent', color:T.dark, borderRadius:T.r12, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:T.fontSans, flexShrink:0, transition:'border-color 0.15s' }}
-                  onMouseEnter={e=>e.currentTarget.style.borderColor=T.sage} onMouseLeave={e=>e.currentTarget.style.borderColor=T.nude}>
-                  ←
-                </button>
+                {!editingProfileId && (
+                  <button type="button" onClick={()=>{setStep(1);setError('')}}
+                    style={{ padding:'14px 20px', border:`2px solid ${T.nude}`, background:'transparent', color:T.dark, borderRadius:T.r12, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:T.fontSans, flexShrink:0, transition:'border-color 0.15s' }}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor=T.sage} onMouseLeave={e=>e.currentTarget.style.borderColor=T.nude}>
+                    ←
+                  </button>
+                )}
                 <button type="submit" disabled={loading||!profession||(profession==='Outro'&&!customProf.trim())||!acceptedTerms}
                   style={{ flex:1, padding:'14px', fontSize:15, fontWeight:700, color:T.cream, background:T.dark, border:'none', borderRadius:T.r12, cursor:(loading||!profession||(profession==='Outro'&&!customProf.trim())||!acceptedTerms)?'not-allowed':'pointer', fontFamily:T.fontSans, transition:'background 0.2s', opacity:(loading||!profession||(profession==='Outro'&&!customProf.trim())||!acceptedTerms)?0.45:1, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}
                   onMouseEnter={e=>{ if(!loading&&profession&&acceptedTerms) e.currentTarget.style.background=T.sage }}
                   onMouseLeave={e=>{ if(!loading&&profession&&acceptedTerms) e.currentTarget.style.background=T.dark }}>
                   {loading && <span style={{ width:16, height:16, border:`2px solid ${T.cream}`, borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.7s linear infinite', display:'inline-block', flexShrink:0 }}/>}
-                  {loading ? 'Criando conta...' : 'Criar minha conta →'}
+                  {loading ? 'Salvando...' : editingProfileId ? 'Continuar →' : 'Criar minha conta →'}
                 </button>
               </div>
             </form>
