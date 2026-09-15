@@ -111,6 +111,14 @@ function SecBtn({ children, onClick }: { children: React.ReactNode; onClick?: ()
 export default function Onboarding() {
   const router = useRouter()
 
+  async function goToLogin() {
+    // Sign out first: an authenticated user landing on /login gets bounced
+    // straight back into this onboarding by its own redirect logic, so this
+    // is really "leave this account and log into another one".
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
   const [step, setStep] = useState(1)
   const [pid, setPid] = useState('')
   const [slug, setSlug] = useState('')
@@ -243,13 +251,20 @@ export default function Onboarding() {
       {/* ── TOP BAR ── */}
       <div style={{ position:'sticky', top:0, zIndex:50, background:`rgba(247,245,240,0.92)`, backdropFilter:'blur(16px)', borderBottom:`1px solid ${T.nude}`, padding:'0 24px' }}>
         <div style={{ maxWidth:680, margin:'0 auto', padding:'14px 0' }}>
-          {/* Back to cadastro — only on step 1, where there's no previous onboarding step to return to */}
+          {/* Back to cadastro / login — only on step 1, where there's no previous onboarding step to return to */}
           {step===1 && (
-            <button type="button" onClick={()=>router.push('/cadastro?voltar=1')} aria-label="Voltar para o cadastro"
-              style={{ display:'flex', alignItems:'center', gap:5, background:'none', border:'none', padding:'2px 0', marginBottom:8, cursor:'pointer', color:T.muted, fontSize:13, fontWeight:600, fontFamily:T.fontSans, transition:'color 0.15s' }}
-              onMouseEnter={e=>{e.currentTarget.style.color=T.dark}} onMouseLeave={e=>{e.currentTarget.style.color=T.muted}}>
-              <ArrowLeft size={15}/> Voltar
-            </button>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+              <button type="button" onClick={()=>router.push('/cadastro')} aria-label="Voltar para o cadastro"
+                style={{ display:'flex', alignItems:'center', gap:5, background:'none', border:'none', padding:'2px 0', cursor:'pointer', color:T.muted, fontSize:13, fontWeight:600, fontFamily:T.fontSans, transition:'color 0.15s' }}
+                onMouseEnter={e=>{e.currentTarget.style.color=T.dark}} onMouseLeave={e=>{e.currentTarget.style.color=T.muted}}>
+                <ArrowLeft size={15}/> Voltar
+              </button>
+              <button type="button" onClick={goToLogin} aria-label="Sair e ir para o login"
+                style={{ background:'none', border:'none', padding:'2px 0', cursor:'pointer', color:T.muted, fontSize:12, fontWeight:600, fontFamily:T.fontSans, transition:'color 0.15s' }}
+                onMouseEnter={e=>{e.currentTarget.style.color=T.dark}} onMouseLeave={e=>{e.currentTarget.style.color=T.muted}}>
+                Já tem conta? Entrar
+              </button>
+            </div>
           )}
 
           {/* Logo + step counter */}

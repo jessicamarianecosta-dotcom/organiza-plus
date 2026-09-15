@@ -43,7 +43,6 @@ function CadastroForm() {
   const router  = useRouter()
   const params  = useSearchParams()
   const plano   = params.get('plano') || 'basic'
-  const voltar  = params.get('voltar') === '1'
 
   const [mounted,  setMounted]  = useState(false)
   const [checking, setChecking] = useState(true)
@@ -51,9 +50,13 @@ function CadastroForm() {
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
   const [showPw,   setShowPw]   = useState(false)
-  // Set when we arrived here via the onboarding "Voltar" button for an
-  // account that already exists — submitting must update the existing
-  // profile instead of calling the signup function again.
+  const [emailTaken, setEmailTaken] = useState(false)
+  // Set whenever this page is reached by an already-authenticated user whose
+  // account exists but onboarding isn't finished — via the onboarding
+  // "Voltar" button, the browser/Android back gesture, or a direct URL hit.
+  // Submitting must then update the existing profile, never call signup
+  // again (that would either fail as "already registered" or, worse, create
+  // a second account).
   const [editingProfileId, setEditingProfileId] = useState('')
 
   const [name,     setName]     = useState('')
@@ -77,10 +80,12 @@ function CadastroForm() {
           supabase.from('profiles').select('onboarding_done, name, profession').eq('id', user.id).single()
         )
         if (!p) { setChecking(false); return }
-        if (voltar && !p.onboarding_done) {
-          // Coming back from onboarding step 1: account already exists, so
-          // don't bounce forward again — show the profession step prefilled
-          // instead, with terms already accepted at signup.
+        if (!p.onboarding_done) {
+          // Account already exists but onboarding isn't finished: never
+          // bounce this user forward, however they landed here (our own
+          // "Voltar" button, a back gesture, or a direct URL hit) — show
+          // their data prefilled and editable instead of the fresh signup
+          // form, so nothing gets resubmitted and nothing is lost.
           setEditingProfileId(user.id)
           setName(p.name || '')
           if (p.profession && !PROFESSIONS.includes(p.profession)) {
@@ -93,7 +98,8 @@ function CadastroForm() {
           setChecking(false)
           return
         }
-        void router.push(p.onboarding_done ? '/dashboard' : '/onboarding')
+        // Onboarding already finished: nothing to do on /cadastro.
+        void router.push('/dashboard')
       } catch {
         setChecking(false)
       }
@@ -119,12 +125,14 @@ function CadastroForm() {
     e.preventDefault()
     const finalProf = profession === 'Outro' ? (customProf.trim() || 'Outro') : profession
     if (!finalProf) { setError('Selecione ou informe sua profissão.'); return }
-    setError(''); setLoading(true)
+    setError(''); setEmailTaken(false); setLoading(true)
 
     if (editingProfileId) {
-      // Account already exists (we got here via the onboarding back button):
-      // update the profile in place, never call signup again.
-      const { error: updErr } = await supabase.from('profiles').update({ profession: finalProf }).eq('id', editingProfileId)
+      // Account already exists (we got here via the onboarding back button,
+      // a back gesture, or a direct URL hit): update the profile in place,
+      // never call signup again.
+      if (!name.trim()) { setLoading(false); setError('Informe seu nome.'); return }
+      const { error: updErr } = await supabase.from('profiles').update({ name: name.trim(), profession: finalProf }).eq('id', editingProfileId)
       setLoading(false)
       if (updErr) { setError(`Erro ao salvar: ${updErr.message}`); return }
       router.push('/onboarding')
@@ -174,7 +182,8 @@ function CadastroForm() {
         const msg = data.error || `Erro HTTP ${res.status}`
         console.error('[Cadastro] Erro da Edge Function:', msg)
         if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('already been registered')) {
-          setError('Este e-mail já está cadastrado. Faça login ou recupere sua senha.')
+          setError('Este e-mail já está cadastrado.')
+          setEmailTaken(true)
         } else if (msg.toLowerCase().includes('password')) {
           setError('Senha muito fraca. Use ao menos 6 caracteres.')
         } else if (msg.toLowerCase().includes('valid email') || msg.toLowerCase().includes('invalid email')) {
@@ -256,15 +265,20 @@ function CadastroForm() {
           </div>
 
           <h1 style={{ fontFamily:T.fontSerif, fontSize:24, color:T.dark, margin:'0 0 4px' }}>
-            {step===1 ? 'Crie sua conta' : 'Sua profissão'}
+            {editingProfileId ? 'Confira seus dados' : step===1 ? 'Crie sua conta' : 'Sua profissão'}
           </h1>
           <p style={{ fontSize:14, color:T.muted, margin:'0 0 24px' }}>
-            {step===1 ? 'Preencha seus dados de acesso.' : 'Selecione ou informe sua área de atuação.'}
+            {editingProfileId ? 'Corrija o que precisar antes de continuar o cadastro.' : step===1 ? 'Preencha seus dados de acesso.' : 'Selecione ou informe sua área de atuação.'}
           </p>
 
           {error && (
-            <div style={{ background:T.redL, border:`1px solid ${T.redB}`, color:T.red, fontSize:13, fontWeight:500, padding:'12px 14px', borderRadius:T.r12, marginBottom:18, display:'flex', gap:8, alignItems:'flex-start' }}>
-              <span style={{ fontWeight:700, flexShrink:0 }}>⚠</span> {error}
+            <div style={{ background:T.redL, border:`1px solid ${T.redB}`, color:T.red, fontSize:13, fontWeight:500, padding:'12px 14px', borderRadius:T.r12, marginBottom:18, display:'flex', flexDirection:'column', gap:8 }}>
+              <span><span style={{ fontWeight:700 }}>⚠</span> {error}</span>
+              {emailTaken && (
+                <Link href="/login" style={{ alignSelf:'flex-start', color:T.dark, fontWeight:700, fontSize:13, textDecoration:'underline' }}>
+                  Ir para o login →
+                </Link>
+              )}
             </div>
           )}
 
@@ -300,6 +314,9 @@ function CadastroForm() {
           {/* ── STEP 2 ── */}
           {step===2 && (
             <form onSubmit={handleSubmit}>
+              {editingProfileId && (
+                <FI label="Nome completo *" value={name} set={setName} placeholder="Ex: Dra. Ana Beatriz Silva" autoFocus/>
+              )}
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:profession==='Outro'?12:18 }}>
                 {PROFESSIONS.map(p=>(
                   <button key={p} type="button" onClick={()=>{setProfession(p);setCustomProf('');setError('')}}
@@ -334,8 +351,8 @@ function CadastroForm() {
                     ←
                   </button>
                 )}
-                <button type="submit" disabled={loading||!profession||(profession==='Outro'&&!customProf.trim())||!acceptedTerms}
-                  style={{ flex:1, padding:'14px', fontSize:15, fontWeight:700, color:T.cream, background:T.dark, border:'none', borderRadius:T.r12, cursor:(loading||!profession||(profession==='Outro'&&!customProf.trim())||!acceptedTerms)?'not-allowed':'pointer', fontFamily:T.fontSans, transition:'background 0.2s', opacity:(loading||!profession||(profession==='Outro'&&!customProf.trim())||!acceptedTerms)?0.45:1, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}
+                <button type="submit" disabled={loading||!profession||(profession==='Outro'&&!customProf.trim())||!acceptedTerms||(!!editingProfileId&&!name.trim())}
+                  style={{ flex:1, padding:'14px', fontSize:15, fontWeight:700, color:T.cream, background:T.dark, border:'none', borderRadius:T.r12, cursor:(loading||!profession||(profession==='Outro'&&!customProf.trim())||!acceptedTerms||(!!editingProfileId&&!name.trim()))?'not-allowed':'pointer', fontFamily:T.fontSans, transition:'background 0.2s', opacity:(loading||!profession||(profession==='Outro'&&!customProf.trim())||!acceptedTerms||(!!editingProfileId&&!name.trim()))?0.45:1, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}
                   onMouseEnter={e=>{ if(!loading&&profession&&acceptedTerms) e.currentTarget.style.background=T.sage }}
                   onMouseLeave={e=>{ if(!loading&&profession&&acceptedTerms) e.currentTarget.style.background=T.dark }}>
                   {loading && <span style={{ width:16, height:16, border:`2px solid ${T.cream}`, borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.7s linear infinite', display:'inline-block', flexShrink:0 }}/>}
@@ -347,8 +364,18 @@ function CadastroForm() {
 
           <div style={{ textAlign:'center', marginTop:24, paddingTop:24, borderTop:`1px solid ${T.nude}` }}>
             <p style={{ fontSize:14, color:T.muted, margin:0 }}>
-              Já tem conta?{' '}
-              <Link href="/login" style={{ color:T.sage, fontWeight:700, textDecoration:'none' }}>Entrar</Link>
+              {editingProfileId ? (
+                <>Quer entrar com outra conta?{' '}
+                  <button type="button" onClick={async()=>{ await supabase.auth.signOut(); router.push('/login') }}
+                    style={{ color:T.sage, fontWeight:700, background:'none', border:'none', padding:0, font:'inherit', cursor:'pointer', textDecoration:'none' }}>
+                    Entrar
+                  </button>
+                </>
+              ) : (
+                <>Já tem conta?{' '}
+                  <Link href="/login" style={{ color:T.sage, fontWeight:700, textDecoration:'none' }}>Entrar</Link>
+                </>
+              )}
             </p>
           </div>
         </div>
